@@ -8,6 +8,7 @@ publish*/
 
 # ===== 数据库（含所有测试库）=====
 *.db
+*.db.bak
 *.db-shm
 *.db-wal
 

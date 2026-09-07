@@ -671,7 +671,7 @@
       currentExamIdForExport = examId;
       document.getElementById('detailTitle').textContent = '📊 ' + title + ' - 成绩明细';
       try {
-        var results = await api('GET', '/history/results?examId=' + examId);
+        var results = await api('GET', '/history/exams/' + examId + '/results');
         var tbody = document.getElementById('detailBody');
         if (!results || !results.length) {
           tbody.innerHTML = '<tr><td colspan="4" class="empty-state">暂无成绩数据</td></tr>';
@@ -696,7 +696,7 @@
       if (!currentExamIdForExport) return;
       try {
         var token = getToken();
-        var res = await fetch(API + '/history/export?examId=' + currentExamIdForExport, {
+        var res = await fetch(API + '/history/exams/' + currentExamIdForExport + '/export', {
           headers: { 'Authorization': 'Bearer ' + token }
         });
         if (!res.ok) throw new Error('导出失败');
