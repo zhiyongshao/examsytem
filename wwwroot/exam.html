@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>在线考试系统 - 考试</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav class="navbar" id="navbar" style="display:none;">
+    <span class="title" id="navTitle">在线考试</span>
+    <div class="user-info">
+      <span id="userName"></span>
+      <button class="btn-logout" onclick="logout()">退出</button>
+    </div>
+  </nav>
+
+  <!-- ===== 页面1：考试列表 ===== -->
+  <div id="pageList" style="display:none;">
+    <div class="container">
+      <div class="page-header">
+        <h2>📋 可用考试</h2>
+        <p>选择一场考试开始作答</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="loadExams()">🔄 刷新列表</button>
+      </div>
+      <ul class="exam-list" id="examList"></ul>
+    </div>
+  </div>
+
+  <!-- ===== 页面2：答题页 ===== -->
+  <div id="pageExam" style="display:none;">
+    <!-- 倒计时 -->
+    <div class="exam-timer" id="timerBar" style="display:none;">
+      <span>⏱ 剩余时间</span>
+      <span class="time" id="timerDisplay">--:--</span>
+    </div>
+
+    <div class="container" id="questionContainer" style="padding-bottom:80px;"></div>
+
+    <!-- 底部提交栏 -->
+    <div class="submit-bar" id="submitBar" style="display:none;">
+      <button class="btn btn-outline flex-1" onclick="saveDraft()">💾 保存草稿</button>
+      <button class="btn btn-danger flex-1" onclick="confirmSubmit()">📤 提交试卷</button>
+    </div>
+  </div>
+
+  <!-- ===== 页面3：排名/成绩 ===== -->
+  <div id="pageResult" style="display:none;">
+    <div class="container">
+      <div class="card result-card" id="resultCard"></div>
+      <div class="ranking-panel" id="rankingPanel" style="display:none;">
+        <h3>🏆 实时排名</h3>
+        <ul class="ranking-list" id="rankingList"></ul>
+      </div>
+      <div style="margin-top:20px;text-align:center;">
+        <button class="btn btn-outline" onclick="backToList()">← 返回考试列表</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // ---- 状态 ----
+    let currentExam = null;
+    let currentSession = null;
+    let questions = [];
+    let timerInterval = null;
+    let remainingSeconds = 0;
+    let draftAnswers = {};
+
+    // ---- 初始化 ----
+    (function init() {
+      const user = getUser();
+      if (!user.role) { location.href = 'index.html'; return; }
+      if (user.role === 'Admin') { location.href = '/admin'; return; }
+
+      $('#navbar').style.display = 'flex';
+      $('#userName').textContent = user.displayName || user.username;
+      showPage('list');
+      loadExams();
+    })();
+
+    function showPage(page) {
+      $('#pageList').style.display   = page === 'list' ? '' : 'none';
+      $('#pageExam').style.display   = page === 'exam' ? '' : 'none';
+      $('#pageResult').style.display = page === 'result' ? '' : 'none';
+      $('#timerBar').style.display   = page === 'exam' ? '' : 'none';
+      $('#submitBar').style.display  = page === 'exam' ? '' : 'none';
+      if (page === 'list') $('#navTitle').textContent = '📋 可用考试';
+      if (page === 'exam') $('#navTitle').textContent = '📝 正在答题';
+      if (page === 'result') $('#navTitle').textContent = '📊 考试结果';
+    }
+
+    // ---- 加载考试列表 ----
+    async function loadExams() {
+      try {
+        const list = await api('GET', '/exams/available');
+        const el = $('#examList');
+        if (!list.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无可用考试</p><p style="font-size:12px;margin-top:4px;">请等待管理员发布考试</p></div>';
+          return;
+        }
+        const now = Date.now();
+        el.innerHTML = list.map(ex => {
+          const start = ex.startTime ? new Date(ex.startTime).getTime() : 0;
+          const end = ex.endTime ? new Date(ex.endTime).getTime() : 0;
+          let clickable = true, label = '进入考试', cls = 'status-pending';
+          if (start && now < start) { clickable = false; label = '未开始'; cls = 'status-started'; }
+          else if (end && now >= end) { clickable = false; label = '已结束'; cls = 'status-started'; }
+          const timeStr = ex.startTime ? new Date(ex.startTime).toLocaleString() : '-';
+          const endStr = ex.endTime ? new Date(ex.endTime).toLocaleString() : '-';
+          return `
+          <li class="exam-item" ${clickable ? `onclick="startExam(${ex.id})"` : ''}>
+            <div class="exam-info">
+              <div class="exam-title">${escHtml(ex.title)}</div>
+              <div class="exam-meta">
+                ${timeStr} ~ ${endStr} · 时长 ${ex.durationMinutes} 分钟 · 总分 ${ex.totalScore} 分
+              </div>
+            </div>
+            <div class="exam-action">
+              <span class="exam-status ${cls}">${label}</span>
+            </div>
+          </li>`;
+        }).join('');
+      } catch(e) { toast('加载失败：' + e.message, 'error'); }
+    }
+
+    // ---- 开始考试 ----
+    async function startExam(examId) {
+      try {
+        // 直接调用开始接口：后端会复用进行中的答卷，并返回题目 + 截止时间
+        const resp = await api('POST', `/exams/${examId}/start`);
+        currentSession = resp;
+        currentExam = { id: examId };
+        questions = resp.questions || [];
+        draftAnswers = {};
+        try { draftAnswers = JSON.parse(localStorage.getItem(`draft_${examId}`) || '{}'); } catch {}
+
+        showPage('exam');
+        renderQuestions();
+        startTimerTo(resp.endTime);
+
+        // 连接实时排名
+        connectRanking(examId, updateRanking);
+
+        toast('考试已开始，祝你好运！', 'success');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    function renderQuestions() {
+      $('#questionContainer').innerHTML = questions.map((q, i) => 
+        renderQuestion(q, i + 1, draftAnswers)
+      ).join('');
+    }
+
+    // ---- 倒计时（以考试的结束时间为截止）----
+    function startTimerTo(endTimeIso) {
+      const endMs = new Date(endTimeIso).getTime();
+      const update = () => {
+        remainingSeconds = Math.max(0, Math.floor((endMs - Date.now()) / 1000));
+        updateTimerDisplay();
+        if (remainingSeconds <= 0) {
+          clearInterval(timerInterval);
+          toast('时间到！自动提交试卷', 'warn');
+          doSubmit();
+        }
+      };
+      update();
+      timerInterval = setInterval(update, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const el = $('#timerDisplay');
+      el.textContent = formatTime(remainingSeconds);
+      if (remainingSeconds <= 60) el.classList.add('urgent');
+      else el.classList.remove('urgent');
+    }
+
+    // ---- 保存草稿 ----
+    function saveDraft() {
+      draftAnswers = collectAnswers();
+      localStorage.setItem(`draft_${currentExam.id}`, JSON.stringify(draftAnswers));
+      toast('草稿已保存', 'success');
+    }
+
+    // ---- 确认提交 ----
+    function confirmSubmit() {
+      const answers = collectAnswers();
+      const unanswered = questions.filter(q => !answers[q.id]).length;
+      let msg = `确定要提交试卷吗？`;
+      if (unanswered > 0) msg += `\n（还有 ${unanswered} 题未作答）`;
+      if (confirm(msg)) doSubmit(answers);
+    }
+
+    async function doSubmit(answers) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      
+      answers = answers || collectAnswers();
+      const answeredCount = Object.values(answers).filter(v => v).length;
+
+      try {
+        const result = await api('POST', `/exams/${currentExam.id}/submit`, { answers: answers, early: true });
+        
+        // 清除草稿
+        localStorage.removeItem(`draft_${currentExam.id}`);
+        
+        // 显示结果
+        showResult(result, answeredCount);
+      } catch(e) {
+        toast('提交失败：' + e.message, 'error');
+      }
+    }
+
+    // ---- 显示结果 & 排名 ----
+    function showResult(result, answeredCount) {
+      showPage('result');
+      const pct = result.totalScore > 0 ? Math.round(result.score / result.totalScore * 100) : 0;
+      $('#resultCard').innerHTML = `
+        <div class="result-score">${result.score}</div>
+        <div class="result-label">/ ${result.totalScore} 分 （${pct}%）</div>
+        <div class="result-detail">
+          <div class="result-row"><span>考试名称</span><span>${escHtml(result.examTitle || '-')}</span></div>
+          <div class="result-row"><span>答题数量</span><span>${answeredCount} / ${questions.length}</span></div>
+          <div class="result-row"><span>正确题数</span><span>${result.correctCount || '-'}</span></div>
+          <div class="result-row"><span>提交时间</span><span>${new Date().toLocaleString()}</span></div>
+        </div>
+        <div style="margin-top:20px;">
+          <button class="btn btn-primary" onclick="loadRanking()">🏆 查看实时排名</button>
+        </div>`;
+      
+      // 自动加载排名
+      setTimeout(() => loadRanking(), 500);
+    }
+
+    async function loadRanking() {
+      try {
+        const data = await api('GET', `/exams/${currentExam.id}/ranking`);
+        updateRanking(data);
+      } catch(e) { console.error('Ranking load error:', e); }
+    }
+
+    function updateRanking(data) {
+      const panel = $('#rankingPanel');
+      const list = $('#rankingList');
+      panel.style.display = '';
+      
+      if (!data.rankings || !data.rankings.length) {
+        list.innerHTML = '<li class="empty-state"><p>暂无排名数据</p></li>';
+        return;
+      }
+      
+      list.innerHTML = data.rankings.map((r, i) => {
+        const posClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-n';
+        return `<li class="ranking-item">
+          <span class="rank-pos ${posClass}">${i + 1}</span>
+          <span class="rank-name">${escHtml(r.displayName || r.username)}</span>
+          <span class="rank-score">${r.score}</span>
+        </li>`;
+      }).join('');
+    }
+
+    function backToList() {
+      if (rankingConn) { rankingConn.stop(); rankingConn = null; }
+      showPage('list');
+      loadExams();
+    }
+
+    // ---- 工具 ----
+    function escHtml(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

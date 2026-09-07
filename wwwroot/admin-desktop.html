@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>在线考试系统 - 管理后台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav class="navbar" id="navbar">
+    <span class="title">🛠 管理后台</span>
+    <div class="user-info">
+      <button class="btn-logout" onclick="openUserMgmt()" title="用户管理">👥 用户管理</button>
+      <button class="btn-logout" onclick="openMyPassword()" title="修改我的密码">🔑 我的密码</button>
+      <span id="userName"></span>
+      <button class="btn-logout" onclick="logout()">退出</button>
+    </div>
+  </nav>
+
+  <!-- Tab 切换 -->
+  <div class="container" style="padding-top:16px;">
+    <div class="admin-layout">
+      <!-- 桌面端侧边栏 -->
+      <aside class="admin-sidebar" id="adminSidebar">
+        <div class="admin-sidebar-item active" data-tab="questions" onclick="switchTab('questions')">
+          <span>📚</span><span>题库管理</span>
+        </div>
+        <div class="admin-sidebar-item" data-tab="publish" onclick="switchTab('publish')">
+          <span>📋</span><span>发布考试</span>
+        </div>
+        <div class="admin-sidebar-item" data-tab="history" onclick="switchTab('history')">
+          <span>📊</span><span>历史记录</span>
+        </div>
+      </aside>
+      <main class="admin-main">
+
+    <!-- ===== Tab1：题库管理 ===== -->
+    <div id="tabQuestions">
+      <div class="card">
+        <div class="toolbar">
+          <input type="text" id="searchKey" placeholder="🔍 搜索题目内容..." oninput="debounceLoadQuestions()">
+          <select id="filterScope" onchange="loadQuestions()">
+            <option value="">全部范围</option>
+          </select>
+          <select id="filterType" onchange="loadQuestions()">
+            <option value="">全部题型</option>
+            <option value="Single">单选</option>
+            <option value="Multiple">多选</option>
+            <option value="Judge">判断</option>
+          </select>
+        </div>
+        <div class="btn-group" style="margin-top:10px;">
+          <button class="btn btn-primary btn-sm" onclick="openQuestionModal()">➕ 新建题目</button>
+          <label class="btn btn-success btn-sm" style="cursor:pointer;">
+            📥 批量导入(Excel/CSV)
+            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCsv(this)">
+          </label>
+          <button class="btn btn-outline btn-sm" onclick="downloadXlsxTemplate()">📊 下载Excel模板</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadCsvTemplate()">📄 下载CSV模板</button>
+          <button class="btn btn-outline btn-sm" onclick="loadQuestions()">🔄 刷新</button>
+        </div>
+      </div>
+
+      <!-- 题目表格 -->
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>知识范围</th><th>题型</th><th>题目</th><th>答案</th><th>操作</th></tr></thead>
+          <tbody id="questionTableBody"><tr><td colspan="6" class="empty-state">加载中...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="questionPagination" style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;"></div>
+    </div>
+
+    <!-- ===== Tab2：发布考试 ===== -->
+    <div id="tabPublish" style="display:none;">
+      <div class="card">
+        <h3 style="margin-bottom:14px;">📋 发布新考试</h3>
+        <div class="form-row" style="margin-bottom:14px;">
+          <label>考试标题 <span style="color:red">*</span></label>
+          <input type="text" id="examTitle" placeholder="例：2026年第一季度安全考试" style="width:100%;">
+        </div>
+        <div class="form-row" style="margin-bottom:14px;">
+          <label>考试说明（可选）</label>
+          <textarea id="examDesc" placeholder="考试说明..." rows="2" style="width:100%;"></textarea>
+        </div>
+        <div class="form-grid-2" style="margin-bottom:14px;">
+          <div>
+            <label>开始时间 <span style="color:red">*</span></label>
+            <input type="datetime-local" id="examStartTime" style="width:100%;" onchange="calcDuration()">
+          </div>
+          <div>
+            <label>结束时间 <span style="color:red">*</span></label>
+            <input type="datetime-local" id="examEndTime" style="width:100%;" onchange="calcDuration()">
+          </div>
+        </div>
+        <div style="margin-bottom:14px;font-size:13px;color:var(--text-secondary);">
+          考试时长（自动计算）：<strong id="examDurationShow" style="color:var(--text-primary);">—</strong>
+        </div>
+
+        <h4 style="margin:18px 0 10px;">📐 选题规则（知识范围 + 题型 → 自动随机抽题）</h4>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">每行设置一组「知识范围（可填多个）+ 题型 + 题数 + 分值」，系统将按此从题库随机抽题生成试卷。</p>
+
+        <div class="table-wrap">
+          <table class="matrix-table" id="matrixTable">
+            <thead><tr><th>知识范围1</th><th>知识范围2</th><th>知识范围3</th><th>题型</th><th>题目数</th><th>每题分值</th><th>操作</th></tr></thead>
+            <tbody id="matrixBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-outline btn-sm" onclick="addMatrixRow()">➕ 添加一行规则</button>
+        </div>
+
+        <h4 style="margin:18px 0 10px;">👥 考试对象</h4>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">不导入名单则默认「全员可考」；导入名单后仅名单内考生可考。系统会自动创建账号：<strong>用户名 = 工号，登录密码 = 发布时自动生成的统一随机密码（所有人相同，发布成功后返回）</strong>。</p>
+        <div class="btn-group" style="margin-bottom:10px;">
+          <label class="btn btn-success btn-sm" style="cursor:pointer;">
+            📥 导入考生名单(Excel/CSV)
+            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCandidates(this)">
+          </label>
+          <button class="btn btn-outline btn-sm" onclick="downloadCandidateTemplate()">📊 下载名单模板</button>
+          <button class="btn btn-outline btn-sm" onclick="clearCandidates()" id="btnClearCandidates" style="display:none;">🗑 清空名单</button>
+        </div>
+        <div id="candidatePanel"></div>
+
+        <div style="margin-top:20px;text-align:right;">
+          <button class="btn btn-primary" onclick="publishExam()" id="btnPublish">🚀 发布考试</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Tab3：历史记录 ===== -->
+    <div id="tabHistory" style="display:none;">
+      <div class="card">
+        <h3 style="margin-bottom:14px;">📊 历史考试</h3>
+        <div id="historyList"></div>
+      </div>
+
+      <div id="historyDetail" style="display:none;" class="card">
+        <h3 style="margin-bottom:14px;" id="detailTitle">考试成绩明细</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>排名</th><th>考生</th><th>得分</th><th>提交时间</th></tr></thead>
+            <tbody id="detailBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-success btn-sm" onclick="exportScores()">📥 导出CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('historyDetail').style.display='none'">← 返回列表</button>
+        </div>
+      </div>
+    </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ===== 题目编辑模态框 ===== -->
+  <div class="modal-overlay" id="questionModal">
+    <div class="modal">
+      <h3 id="modalTitle">新建题目</h3>
+      <input type="hidden" id="qId">
+      <div class="form-row"><label>知识范围 1 <span style="color:red">*</span></label><input type="text" id="qScope1" placeholder="如：物理、数学、安全..."></div>
+      <div class="form-row"><label>知识范围 2（可选）</label><input type="text" id="qScope2" placeholder="留空则不设置"></div>
+      <div class="form-row"><label>知识范围 3（可选）</label><input type="text" id="qScope3" placeholder="留空则不设置"></div>
+      <div class="form-row">
+        <label>题型</label>
+        <select id="qType" onchange="toggleOptions(this.value)">
+          <option value="Single">单选题</option>
+          <option value="Multiple">多选题</option>
+          <option value="Judge">判断题</option>
+        </select>
+      </div>
+      <div class="form-row"><label>题目内容 <span style="color:red">*</span></label><textarea id="qContent" rows="3" placeholder="输入题目..."></textarea></div>
+      <div id="optionsGroup">
+        <div class="form-row"><label>选项 A</label><input type="text" id="qOptA" placeholder="选项A内容"></div>
+        <div class="form-row"><label>选项 B</label><input type="text" id="qOptB" placeholder="选项B内容"></div>
+        <div class="form-row"><label>选项 C</label><input type="text" id="qOptC" placeholder="选项C内容"></div>
+        <div class="form-row"><label>选项 D</label><input type="text" id="qOptD" placeholder="选项D内容"></div>
+      </div>
+      <div class="form-row"><label>标准答案 <span style="color:red">*</span></label><input type="text" id="qAnswer" placeholder="单选/判断填 A/B/C/D，多选填如 AB"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeQuestionModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveQuestion()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 用户管理模态框 ===== -->
+  <div class="modal-overlay" id="userMgmtModal">
+    <div class="modal" style="max-width:900px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;">👥 用户管理</h3>
+        <button class="btn btn-primary btn-sm" onclick="openUserCreateForm()">➕ 新增用户</button>
+      </div>
+      <div class="table-wrap" style="max-height:55vh;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>姓名</th>
+              <th>工号</th>
+              <th>部门</th>
+              <th>角色</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="userMgmtBody"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeUserMgmt()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 用户编辑模态框 ===== -->
+  <div class="modal-overlay" id="userEditModal">
+    <div class="modal" style="max-width:520px;">
+      <h3 id="userEditTitle">编辑用户</h3>
+      <input type="hidden" id="ueId">
+      <div class="form-row"><label>用户名 <span style="color:red">*</span></label><input type="text" id="ueUsername" placeholder="登录用户名"></div>
+      <div class="form-row"><label>密码 <span style="color:red" id="uePwdRequired">*</span></label><input type="text" id="uePassword" placeholder="登录密码"></div>
+      <div class="form-row"><label>姓名</label><input type="text" id="ueDisplayName" placeholder="显示名"></div>
+      <div class="form-row"><label>工号</label><input type="text" id="ueJobNo" placeholder="考生工号"></div>
+      <div class="form-row"><label>部门</label><input type="text" id="ueDepartment" placeholder="所在部门"></div>
+      <div class="form-row">
+        <label>角色</label>
+        <select id="ueRole">
+          <option value="Candidate">考生</option>
+          <option value="Admin">管理员</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeUserEdit()">取消</button>
+        <button class="btn btn-primary" onclick="saveUserEdit()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 修改我的密码模态框 ===== -->
+  <div class="modal-overlay" id="myPwdModal">
+    <div class="modal" style="max-width:420px;">
+      <h3>🔑 修改我的密码</h3>
+      <div class="form-row"><label>当前密码 <span style="color:red">*</span></label><input type="password" id="mpOld" autocomplete="current-password"></div>
+      <div class="form-row"><label>新密码 <span style="color:red">*</span></label><input type="password" id="mpNew" autocomplete="new-password"></div>
+      <div class="form-row"><label>确认新密码 <span style="color:red">*</span></label><input type="password" id="mpNew2" autocomplete="new-password"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeMyPwd()">取消</button>
+        <button class="btn btn-primary" onclick="saveMyPwd()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="admin.js"></script>
+
+  <!-- Scope datalist -->
+  <datalist id="scopeList"></datalist>
+</body>
+</html>

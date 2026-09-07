@@ -1,0 +1,22 @@
+# ===== 编译产物 =====
+bin/
+obj/
+publish*/
+*.exe
+*.dll
+*.pdb
+
+# ===== 数据库（含所有测试库）=====
+*.db
+*.db-shm
+*.db-wal
+
+# ===== 日志 =====
+*.log
+
+# ===== IDE / 编辑器 =====
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
