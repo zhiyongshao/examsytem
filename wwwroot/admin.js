@@ -600,6 +600,7 @@
         endTime: end.toISOString(),
         targetMode: importedCandidates.length ? 'Specified' : 'All',
         targetUserIds: importedCandidates.map(function(c) { return c.id; }),
+        paperMode: document.getElementById('examPaperMode').value || 'Fixed',
         rules: rules
       };
 
@@ -614,6 +615,7 @@
         var msg = '✅ 「' + title + '」发布成功！\n\n';
         msg += '总题数：' + result.totalQuestions + ' 道\n';
         msg += '总分：' + result.totalScore + ' 分\n';
+        msg += '试卷类型：' + (result.paperMode === 'PerCandidate' ? '随机卷（按考生随机）' : '固定卷') + '\n';
         msg += '有效期：' + start.toLocaleString() + ' ~ ' + end.toLocaleString() + '\n';
         if (importedCandidates.length) {
           msg += '考试对象：指定名单 ' + importedCandidates.length + ' 人\n';
@@ -687,13 +689,16 @@
         var targetBadge = e.targetMode === 'Specified'
           ? '<span class="tag tag-type">指定</span>'
           : '<span class="tag tag-scope">全员</span>';
+        var paperBadge = e.paperMode === 'PerCandidate'
+          ? '<span class="tag" style="background:#fff7e6;color:#fa8c16;">随机卷</span>'
+          : '<span class="tag tag-scope">固定卷</span>';
         var validity = (e.startTime ? new Date(e.startTime).toLocaleString() : '-') +
                        '<br>~<br>' + (e.endTime ? new Date(e.endTime).toLocaleString() : '-');
         var titleEsc = escHtml(e.title).replace(/'/g, "\\'");
         var pcount = e.participantCount || 0;
         html += '<tr>' +
           '<td>' + e.id + '</td>' +
-          '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(e.title) + '"><strong>' + escHtml(e.title) + '</strong></td>' +
+          '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(e.title) + '"><strong>' + escHtml(e.title) + '</strong><br>' + paperBadge + '</td>' +
           '<td>' + statusBadge + '</td>' +
           '<td>' + targetBadge + '</td>' +
           '<td>' + e.totalQuestions + '题<br><span style="font-size:12px;color:var(--text-secondary);">' + e.totalScore + ' 分</span></td>' +

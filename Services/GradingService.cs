@@ -26,9 +26,15 @@ public class GradingService : IGradingService
         if (session == null)
             throw new InvalidOperationException("未找到考试答卷，请先开始考试");
 
-        // 试卷题目与分值
-        var examQuestions = await _db.ExamQuestions
-            .Where(q => q.ExamId == examId).ToDictionaryAsync(q => q.QuestionId);
+        // 试卷题目与分值：固定卷用考试级题集，随机卷用本会话独立题集
+        var exam = await _db.Exams.FindAsync(examId);
+        if (exam == null) throw new InvalidOperationException("考试不存在");
+        List<ExamQuestion> examQuestionList;
+        if (exam.PaperMode == ExamPaperMode.PerCandidate)
+            examQuestionList = await _db.ExamQuestions.Where(q => q.SessionId == session.Id).ToListAsync();
+        else
+            examQuestionList = await _db.ExamQuestions.Where(q => q.ExamId == examId && q.SessionId == null).ToListAsync();
+        var examQuestions = examQuestionList.ToDictionary(q => q.QuestionId);
         var correctAnswers = await _db.Questions
             .Where(q => examQuestions.Keys.Contains(q.Id))
             .ToDictionaryAsync(q => q.Id, q => q.Answer);

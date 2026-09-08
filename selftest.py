@@ -209,5 +209,49 @@ check("关闭考试", st == 200)
 st, body = req("GET", "/api/questions", token=stu)
 check("考生无题库权限(403)", st == 403, f"status={st}")
 
+# 17. 按考生随机卷（PerCandidate）：发布时选择，每名考生开始考试时独立随机抽题
+pc_rules = [
+    {"Scope1": "数学", "Type": "Single", "Count": 6, "ScorePerQuestion": 5},
+    {"Scope1": "语文", "Type": "Single", "Count": 6, "ScorePerQuestion": 5},
+    {"Scope1": "英语", "Type": "Single", "Count": 6, "ScorePerQuestion": 5},
+]
+st, body = req("POST", "/api/exams", {
+    "Title": "随机卷测试", "DurationMinutes": 30,
+    "TargetMode": "All", "Rules": pc_rules, "PaperMode": "PerCandidate",
+    "StartTime": "2026-01-01T00:00:00", "EndTime": "2026-12-31T23:59:59"
+}, token=admin)
+check("发布随机卷(PerCandidate)", st == 200, f"status={st} body={body[:120]}")
+pc = j(body)
+pc_id = pc["id"]
+check("随机卷-返回paperMode=PerCandidate", pc.get("paperMode") == "PerCandidate", f"pm={pc.get('paperMode')}")
+check("随机卷总分=90", pc["totalScore"] == 90, f"total={pc['totalScore']}")
+check("随机卷总题数=18", pc["totalQuestions"] == 18, f"n={pc['totalQuestions']}")
+
+def start_as(user):
+    st, body = req("POST", "/api/auth/login", {"Username": user, "Password": user})
+    tok = j(body)["token"]
+    st, body = req("POST", f"/api/exams/{pc_id}/start", token=tok)
+    return j(body)
+
+a = start_as("student1")
+b = start_as("student2")
+c = start_as("student3")
+check("随机卷-考生A开始返回18题", a.get("questions") and len(a["questions"]) == 18, f"n={len(a.get('questions',[]))}")
+check("随机卷-考生B开始返回18题", b.get("questions") and len(b["questions"]) == 18, f"n={len(b.get('questions',[]))}")
+check("随机卷-考生C开始返回18题", c.get("questions") and len(c["questions"]) == 18, f"n={len(c.get('questions',[]))}")
+
+# 同一考生重复开始应一致（按会话存储，幂等）
+a2 = start_as("student1")
+check("随机卷-同考生重复开始卷面一致",
+      [q["id"] for q in a["questions"]] == [q["id"] for q in a2["questions"]],
+      f"a={[q['id'] for q in a['questions']][:6]}.. a2={[q['id'] for q in a2['questions']][:6]}..")
+
+# 不同考生卷面应不同（至少一对顺序/集合不同）
+ids_a = [q["id"] for q in a["questions"]]
+ids_b = [q["id"] for q in b["questions"]]
+ids_c = [q["id"] for q in c["questions"]]
+diff = (ids_a != ids_b) or (ids_b != ids_c) or (ids_a != ids_c)
+check("随机卷-不同考生卷面不同", diff, f"a={ids_a} b={ids_b} c={ids_c}")
+
 print("\n==== 自测完成，失败项：%d ====" % FAILED)
 sys.exit(1 if FAILED else 0)

@@ -26,7 +26,7 @@ public class HistoryController : ControllerBase
         var result = exams.Select(e =>
         {
             var scores = sessions.GetValueOrDefault(e.Id, new List<double>());
-            var total = e.Questions.Sum(q => q.Score);
+            var total = e.TotalScore;
             double passRate = 0;
             if (scores.Count > 0 && total > 0)
                 passRate = scores.Count(s => s >= total * 0.6) * 100.0 / scores.Count;
@@ -53,7 +53,7 @@ public class HistoryController : ControllerBase
     {
         var exam = await _db.Exams.Include(e => e.Questions).FirstOrDefaultAsync(e => e.Id == id);
         if (exam == null) return NotFound();
-        var total = exam.Questions.Sum(q => q.Score);
+        var total = exam.TotalScore;
 
         var sessions = await _db.ExamSessions
             .Where(s => s.ExamId == id && s.Status == SessionStatus.Graded)

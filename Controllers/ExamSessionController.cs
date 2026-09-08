@@ -59,8 +59,36 @@ public class ExamSessionController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
-        var questions = exam.Questions.OrderBy(q => q.Order)
-            .Select(q => ToClientQuestion(q)).ToList();
+        List<ClientQuestion> questions;
+        if (exam.PaperMode == ExamPaperMode.PerCandidate)
+        {
+            // 按考生随机卷：该会话尚未抽题则独立抽一份并存库；已抽则复用（幂等）
+            var existing = await _db.ExamQuestions
+                .Where(q => q.SessionId == session.Id)
+                .OrderBy(q => q.Order)
+                .Include(q => q.Question)
+                .ToListAsync();
+            List<ExamQuestion> paper;
+            if (existing.Count > 0)
+            {
+                paper = existing;
+            }
+            else
+            {
+                paper = await _examSvc.DrawSessionPaperAsync(exam.Id, session.Id);
+                paper = await _db.ExamQuestions
+                    .Where(q => q.SessionId == session.Id)
+                    .OrderBy(q => q.Order)
+                    .Include(q => q.Question)
+                    .ToListAsync();
+            }
+            questions = paper.Select(q => ToClientQuestion(q)).ToList();
+        }
+        else
+        {
+            questions = exam.Questions.OrderBy(q => q.Order)
+                .Select(q => ToClientQuestion(q)).ToList();
+        }
 
         // 截止时间：以考试的结束时间为准（固定时段考试），无结束时间则回退为开始+时长
         var endTime = exam.EndTime ?? session.StartTime.AddMinutes(exam.DurationMinutes);

@@ -104,6 +104,8 @@ using (var scope = app.Services.CreateScope())
     EnsureColumn(db, "Users", "JobNo", "TEXT");
     EnsureColumn(db, "Users", "Department", "TEXT");
     EnsureColumn(db, "Exams", "CandidatePassword", "TEXT");
+    EnsureColumn(db, "Exams", "PaperMode", "INTEGER NOT NULL DEFAULT 0");
+    EnsureColumn(db, "ExamQuestions", "SessionId", "INTEGER");
     Seed(db);
 }
 
@@ -137,7 +139,7 @@ static void EnsureColumn(AppDbContext db, string table, string column, string ty
         if (!exists)
         {
             using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type} NULL";
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type}";
             alter.ExecuteNonQuery();
         }
     }

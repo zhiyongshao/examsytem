@@ -27,6 +27,15 @@ public enum TargetMode
     Specified = 1  // 指定人员
 }
 
+/// <summary>卷型：决定抽题时机。
+/// Fixed = 发布时一次性抽好，所有考生题目与顺序完全一致（固定卷）；
+/// PerCandidate = 每名考生开始考试时按规则独立随机抽题（随机卷，互不相同）。</summary>
+public enum ExamPaperMode
+{
+    Fixed = 0,
+    PerCandidate = 1
+}
+
 public enum SessionStatus
 {
     InProgress = 0,
@@ -89,6 +98,7 @@ public class Exam
     public TargetMode TargetMode { get; set; } = TargetMode.All;
     public string? TargetUserIds { get; set; } // 指定人员：逗号分隔的 UserId
     public string? CandidatePassword { get; set; } // 指定人员发布时生成的统一随机登录密码
+    public ExamPaperMode PaperMode { get; set; } = ExamPaperMode.Fixed; // 卷型：固定卷 / 按考生随机
     public List<ExamRule> Rules { get; set; } = new();
     public List<ExamQuestion> Questions { get; set; } = new();
 }
@@ -106,11 +116,14 @@ public class ExamRule
     public int ScorePerQuestion { get; set; }
 }
 
-/// <summary>考试实际抽出的题目（含分值与顺序）。</summary>
+/// <summary>考试实际抽出的题目（含分值与顺序）。
+/// 固定卷：SessionId 为 null，归属整场考试（所有考生共用）。
+/// 随机卷：SessionId 指向某考生的答卷，每位考生各自一套。</summary>
 public class ExamQuestion
 {
     public int Id { get; set; }
     public int ExamId { get; set; }
+    public int? SessionId { get; set; } // 仅随机卷：区分每位考生的独立卷
     public int QuestionId { get; set; }
     public int Score { get; set; }
     public int Order { get; set; }

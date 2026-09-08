@@ -134,6 +134,7 @@ public class PublishExamRequest
     public List<int> TargetUserIds { get; set; } = new();
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
+    public ExamPaperMode PaperMode { get; set; } = ExamPaperMode.Fixed; // 卷型：固定卷 / 按考生随机
     public List<ExamRuleRequest> Rules { get; set; } = new();
 }
 
@@ -158,6 +159,7 @@ public class ExamSummaryDto
     public int TotalScore { get; set; }
     public string Status { get; set; } = "";
     public string TargetMode { get; set; } = "";
+    public string PaperMode { get; set; } = ""; // Fixed / PerCandidate
     public DateTime CreatedAt { get; set; }
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
@@ -173,6 +175,7 @@ public class ExamDetailDto
     public int TotalScore { get; set; }
     public string Status { get; set; } = "";
     public string TargetMode { get; set; } = "";
+    public string PaperMode { get; set; } = ""; // Fixed / PerCandidate
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
     public string? CandidatePassword { get; set; }

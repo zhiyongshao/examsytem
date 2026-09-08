@@ -15,6 +15,9 @@ public interface IExamService
     Task<bool> DeleteAsync(int examId);
     Task<ExamDetailDto> RepublishAsync(int sourceExamId, int adminId);
     Task<ExamEntranceDto?> GetEntranceAsync(int examId);
+
+    // 随机卷：按会话（考生）独立抽题并落库，返回该考生的题集
+    Task<List<ExamQuestion>> DrawSessionPaperAsync(int examId, int sessionId);
 }
 
 public class ExamService : IExamService
@@ -66,10 +69,7 @@ public class ExamService : IExamService
                 u.PasswordHash = PasswordHelper.Hash(candidatePassword);
         }
 
-        int order = 0;
-        var usedQuestionIds = new HashSet<int>();
-        var shortfalls = new List<string>();
-
+        // 先把请求中的选题规则写入考试（供抽题与总分计算使用）
         foreach (var rule in req.Rules)
         {
             exam.Rules.Add(new ExamRule
@@ -81,46 +81,36 @@ public class ExamService : IExamService
                 Count = rule.Count,
                 ScorePerQuestion = rule.ScorePerQuestion
             });
-
-            // 抽题：规则的三范围任一被题目的任一范围"包含"（子串命中）+ 题型匹配，排除已用
-            var scopes = new[] { rule.Scope1, rule.Scope2, rule.Scope3 }
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(s => s!)
-                .ToArray();
-            var candidates = await _db.Questions
-                .Where(q => scopes.Any(s => (q.Scope1 ?? "").Contains(s)
-                                         || (q.Scope2 ?? "").Contains(s)
-                                         || (q.Scope3 ?? "").Contains(s))
-                            && q.Type == rule.Type
-                            && !usedQuestionIds.Contains(q.Id))
-                .Select(q => q.Id).ToListAsync();
-
-            if (candidates.Count < rule.Count)
-            {
-                var scopeLabel = string.Join("/", scopes);
-                shortfalls.Add($"范围「{scopeLabel}」+ 题型「{rule.Type}」：需 {rule.Count} 道，题库仅有 {candidates.Count} 道");
-                continue;
-            }
-
-            // 随机抽 count 道
-            var picked = Shuffle(candidates).Take(rule.Count).ToList();
-            foreach (var qid in picked)
-            {
-                usedQuestionIds.Add(qid);
-                exam.Questions.Add(new ExamQuestion
-                {
-                    QuestionId = qid,
-                    Score = rule.ScorePerQuestion,
-                    Order = order++
-                });
-            }
         }
 
+        // 校验题库题量 + 按规则计算总分/总题数（两种卷型都依据规则，确保总分准确）
+        int totalQuestions = 0;
+        int totalScore = 0;
+        var shortfalls = new List<string>();
+        foreach (var rule in exam.Rules)
+        {
+            var scopes = new[] { rule.Scope1, rule.Scope2, rule.Scope3 }
+                .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToArray();
+            var poolCount = await _db.Questions
+                .CountAsync(q => scopes.Any(s => (q.Scope1 ?? "").Contains(s)
+                                             || (q.Scope2 ?? "").Contains(s)
+                                             || (q.Scope3 ?? "").Contains(s))
+                                && q.Type == rule.Type);
+            if (poolCount < rule.Count)
+                shortfalls.Add($"范围「{string.Join("/", scopes)}」+ 题型「{rule.Type}」：需 {rule.Count} 道，题库仅有 {poolCount} 道");
+            totalQuestions += rule.Count;
+            totalScore += rule.Count * rule.ScorePerQuestion;
+        }
         if (shortfalls.Count > 0)
             throw new InvalidOperationException("题库题量不足：\n" + string.Join("\n", shortfalls));
 
-        exam.TotalQuestions = exam.Questions.Count;
-        exam.TotalScore = exam.Questions.Sum(q => q.Score);
+        // 固定卷：发布时一次性抽题；随机卷：不预抽，由考生开始考试时各自抽
+        if (req.PaperMode == ExamPaperMode.Fixed)
+            exam.Questions = await DrawPaperAsync(exam.Rules.ToList(), exam.Id, null);
+
+        exam.PaperMode = req.PaperMode;
+        exam.TotalQuestions = totalQuestions;
+        exam.TotalScore = totalScore;
 
         _db.Exams.Add(exam);
         await _db.SaveChangesAsync();
@@ -176,6 +166,7 @@ public class ExamService : IExamService
             TotalScore = exam.TotalScore,
             Status = exam.Status.ToString(),
             TargetMode = exam.TargetMode.ToString(),
+            PaperMode = exam.PaperMode.ToString(),
             StartTime = exam.StartTime,
             EndTime = exam.EndTime,
             CandidatePassword = exam.CandidatePassword,
@@ -220,6 +211,7 @@ public class ExamService : IExamService
                 TotalScore = e.TotalScore,
                 Status = e.Status.ToString(),
                 TargetMode = e.TargetMode.ToString(),
+                PaperMode = e.PaperMode.ToString(),
                 CreatedAt = e.CreatedAt,
                 StartTime = e.StartTime,
                 EndTime = e.EndTime
@@ -237,6 +229,67 @@ public class ExamService : IExamService
             (list[i], list[j]) = (list[j], list[i]);
         }
         return list;
+    }
+
+    /// <summary>
+    /// 按规则从题库抽题，返回 ExamQuestion 列表（未保存）。
+    /// usedQuestionIds 跨规则去重，避免同一份卷内题目重复。
+    /// sessionId 为 null 表示固定卷（归属整场考试）；非 null 表示随机卷（归属某考生会话）。
+    /// </summary>
+    private async Task<List<ExamQuestion>> DrawPaperAsync(List<ExamRule> rules, int examId, int? sessionId)
+    {
+        var result = new List<ExamQuestion>();
+        var usedQuestionIds = new HashSet<int>();
+        int order = 0;
+        foreach (var rule in rules)
+        {
+            var scopes = new[] { rule.Scope1, rule.Scope2, rule.Scope3 }
+                .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToArray();
+            var candidates = await _db.Questions
+                .Where(q => scopes.Any(s => (q.Scope1 ?? "").Contains(s)
+                                         || (q.Scope2 ?? "").Contains(s)
+                                         || (q.Scope3 ?? "").Contains(s))
+                            && q.Type == rule.Type
+                            && !usedQuestionIds.Contains(q.Id))
+                .Select(q => q.Id).ToListAsync();
+
+            if (candidates.Count < rule.Count)
+                throw new InvalidOperationException(
+                    $"范围「{string.Join("/", scopes)}」+ 题型「{rule.Type}」：需 {rule.Count} 道，题库仅有 {candidates.Count} 道");
+
+            var picked = Shuffle(candidates).Take(rule.Count).ToList();
+            foreach (var qid in picked)
+            {
+                usedQuestionIds.Add(qid);
+                result.Add(new ExamQuestion
+                {
+                    ExamId = examId,
+                    SessionId = sessionId,
+                    QuestionId = qid,
+                    Score = rule.ScorePerQuestion,
+                    Order = order++
+                });
+            }
+        }
+        return result;
+    }
+
+    /// <summary>随机卷：为某考生的答卷独立抽题并落库（幂等：已抽过则直接返回）。</summary>
+    public async Task<List<ExamQuestion>> DrawSessionPaperAsync(int examId, int sessionId)
+    {
+        var existing = await _db.ExamQuestions
+            .Where(q => q.SessionId == sessionId).ToListAsync();
+        if (existing.Count > 0) return existing;
+
+        var exam = await _db.Exams.Include(e => e.Rules).FirstOrDefaultAsync(e => e.Id == examId);
+        if (exam == null) throw new InvalidOperationException("考试不存在");
+        if (exam.PaperMode != ExamPaperMode.PerCandidate)
+            throw new InvalidOperationException("仅「按考生随机」模式的考试需要按会话抽题");
+
+        var paper = await DrawPaperAsync(exam.Rules.ToList(), examId, sessionId);
+        _db.ExamQuestions.AddRange(paper);
+        await _db.SaveChangesAsync();
+        return paper;
     }
 
     // ===== 考试管理：修改 =====
@@ -327,6 +380,7 @@ public class ExamService : IExamService
             EndTime = source.EndTime,
             TargetMode = source.TargetMode,
             TargetUserIds = source.TargetUserIds,
+            PaperMode = source.PaperMode,
             Status = ExamStatus.Published
         };
 
@@ -344,46 +398,33 @@ public class ExamService : IExamService
             });
         }
 
-        // 重新抽题
-        var usedQuestionIds = new HashSet<int>();
-        var shortfalls = new List<string>();
-        int order = 0;
+        // 校验题库题量 + 按规则计算总分/总题数（两种卷型都依据规则）
+        int pcTotalQuestions = 0;
+        int pcTotalScore = 0;
+        var pcShortfalls = new List<string>();
         foreach (var rule in exam.Rules)
         {
             var scopes = new[] { rule.Scope1, rule.Scope2, rule.Scope3 }
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(s => s!)
-                .ToArray();
-            var candidates = await _db.Questions
-                .Where(q => scopes.Any(s => (q.Scope1 ?? "").Contains(s)
-                                         || (q.Scope2 ?? "").Contains(s)
-                                         || (q.Scope3 ?? "").Contains(s))
-                            && q.Type == rule.Type
-                            && !usedQuestionIds.Contains(q.Id))
-                .Select(q => q.Id).ToListAsync();
-
-            if (candidates.Count < rule.Count)
-            {
-                var scopeLabel = string.Join("/", scopes);
-                shortfalls.Add($"范围「{scopeLabel}」+ 题型「{rule.Type}」：需 {rule.Count} 道，题库仅有 {candidates.Count} 道");
-                continue;
-            }
-
-            var picked = Shuffle(candidates).Take(rule.Count).ToList();
-            foreach (var qid in picked)
-            {
-                usedQuestionIds.Add(qid);
-                exam.Questions.Add(new ExamQuestion
-                {
-                    QuestionId = qid,
-                    Score = rule.ScorePerQuestion,
-                    Order = order++
-                });
-            }
+                .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToArray();
+            var poolCount = await _db.Questions
+                .CountAsync(q => scopes.Any(s => (q.Scope1 ?? "").Contains(s)
+                                             || (q.Scope2 ?? "").Contains(s)
+                                             || (q.Scope3 ?? "").Contains(s))
+                                && q.Type == rule.Type);
+            if (poolCount < rule.Count)
+                pcShortfalls.Add($"范围「{string.Join("/", scopes)}」+ 题型「{rule.Type}」：需 {rule.Count} 道，题库仅有 {poolCount} 道");
+            pcTotalQuestions += rule.Count;
+            pcTotalScore += rule.Count * rule.ScorePerQuestion;
         }
+        if (pcShortfalls.Count > 0)
+            throw new InvalidOperationException("题库题量不足：\n" + string.Join("\n", pcShortfalls));
 
-        if (shortfalls.Count > 0)
-            throw new InvalidOperationException("题库题量不足：\n" + string.Join("\n", shortfalls));
+        // 固定卷：重新抽题并落库；随机卷：不预抽（考生开始时各自抽）
+        if (source.PaperMode == ExamPaperMode.Fixed)
+            exam.Questions = await DrawPaperAsync(exam.Rules.ToList(), exam.Id, null);
+
+        exam.TotalQuestions = pcTotalQuestions;
+        exam.TotalScore = pcTotalScore;
 
         // 指定人员：重新生成密码
         if (exam.TargetMode == TargetMode.Specified && !string.IsNullOrWhiteSpace(exam.TargetUserIds))
@@ -396,8 +437,7 @@ public class ExamService : IExamService
             foreach (var u in targetUsers) u.PasswordHash = PasswordHelper.Hash(newPwd);
         }
 
-        exam.TotalQuestions = exam.Questions.Count;
-        exam.TotalScore = exam.Questions.Sum(q => q.Score);
+        // 总分/总题数已在上面按规则计算（固定卷=已抽题合计，随机卷=规则合计）
 
         _db.Exams.Add(exam);
         await _db.SaveChangesAsync();

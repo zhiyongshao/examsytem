@@ -101,6 +101,14 @@
           考试时长（自动计算）：<strong id="examDurationShow" style="color:var(--text-primary);" data-page-node-id="a8BDsebkFWUwLOi6GSapft">—</strong>
         </div>
 
+        <div class="form-row" style="margin-bottom:14px;">
+          <label>试卷类型</label>
+          <select id="examPaperMode" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
+            <option value="Fixed">固定卷（发布时抽好，所有考生题目一致）</option>
+            <option value="PerCandidate">随机卷（每名考生独立随机抽题，互不相同）</option>
+          </select>
+        </div>
+
         <h4 style="margin:18px 0 10px;" data-page-node-id="uqfXUHyDPpvXa1fCiFbKEi">📐 选题规则（知识范围 + 题型 → 自动随机抽题）</h4>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;" data-page-node-id="P61e04Utj7066U9B7QAzQz">每行设置一组「知识范围（可填多个）+ 题型 + 题数 + 分值」，系统将按此从题库随机抽题生成试卷。</p>
 
@@ -347,7 +355,7 @@
     </div>
   </div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 <script src="admin.js?v=2"></script>
 
   <!-- Scope datalist -->

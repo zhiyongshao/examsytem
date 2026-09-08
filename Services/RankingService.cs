@@ -17,7 +17,7 @@ public class RankingService : IRankingService
 
     public async Task<List<RankingItem>> ComputeAsync(int examId)
     {
-        var total = await _db.ExamQuestions.Where(q => q.ExamId == examId).SumAsync(q => q.Score);
+        var total = (await _db.Exams.FindAsync(examId))?.TotalScore ?? 0;
         var sessions = await _db.ExamSessions
             .Where(s => s.ExamId == examId && s.Status == SessionStatus.Graded)
             .Include(s => s.Answers)
