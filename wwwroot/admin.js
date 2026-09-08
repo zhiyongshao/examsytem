@@ -36,6 +36,7 @@
     function switchTab(tab) {
       document.getElementById('tabQuestions').style.display = tab === 'questions' ? '' : 'none';
       document.getElementById('tabPublish').style.display   = tab === 'publish'   ? '' : 'none';
+      document.getElementById('tabExams').style.display     = tab === 'exams'     ? '' : 'none';
       document.getElementById('tabHistory').style.display   = tab === 'history'   ? '' : 'none';
       // 同步顶部 tab 按钮
       var topBtns = document.querySelectorAll('#tabBar button');
@@ -50,6 +51,7 @@
         s.className = s.getAttribute('data-tab') === tab ? 'admin-sidebar-item active' : 'admin-sidebar-item';
       }
       if (tab === 'history') loadHistory();
+      if (tab === 'exams') loadExams();
     }
 
     // ==================== 题库管理 ====================
@@ -632,6 +634,250 @@
         document.getElementById('btnPublish').disabled = false;
         document.getElementById('btnPublish').textContent = '🚀 发布考试';
       }
+    }
+
+    // ==================== 考试管理 ====================
+
+    var _examMgmtCache = [];
+    var _examMgmtTimer = null;
+    function debounceLoadExams() { clearTimeout(_examMgmtTimer); _examMgmtTimer = setTimeout(loadExams, 400); }
+
+    async function loadExams() {
+      var tbody = document.getElementById('examMgmtBody');
+      try {
+        var list = await api('GET', '/exams');
+        _examMgmtCache = list || [];
+        var key = (document.getElementById('examSearch').value || '').trim().toLowerCase();
+        var status = document.getElementById('examStatusFilter').value;
+        var target = document.getElementById('examTargetFilter').value;
+        var filtered = _examMgmtCache.filter(function(e) {
+          if (key && (e.title || '').toLowerCase().indexOf(key) === -1) return false;
+          if (status && e.status !== status) return false;
+          if (target && e.targetMode !== target) return false;
+          return true;
+        });
+        renderExamMgmt(filtered);
+      } catch(e) {
+        console.error('[Admin] loadExams error:', e);
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state" style="color:var(--danger);">❌ 加载失败：' + escHtml(e.message) + '</td></tr>';
+      }
+    }
+
+    function renderExamMgmt(list) {
+      var tbody = document.getElementById('examMgmtBody');
+      if (!list || !list.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="icon">📭</div><p>暂无考试</p><p style="font-size:12px;margin-top:4px;">请到「发布考试」标签创建</p></td></tr>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var statusBadge = e.status === 'Published'
+          ? '<span class="tag" style="background:#e6f7ff;color:#1890ff;">进行中</span>'
+          : '<span class="tag tag-scope">已关闭</span>';
+        var targetBadge = e.targetMode === 'Specified'
+          ? '<span class="tag tag-type">指定</span>'
+          : '<span class="tag tag-scope">全员</span>';
+        var validity = (e.startTime ? new Date(e.startTime).toLocaleString() : '-') +
+                       '<br>~<br>' + (e.endTime ? new Date(e.endTime).toLocaleString() : '-');
+        var titleEsc = escHtml(e.title).replace(/'/g, "\\'");
+        var pcount = e.participantCount || 0;
+        html += '<tr>' +
+          '<td>' + e.id + '</td>' +
+          '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(e.title) + '"><strong>' + escHtml(e.title) + '</strong></td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td>' + targetBadge + '</td>' +
+          '<td>' + e.totalQuestions + '题<br><span style="font-size:12px;color:var(--text-secondary);">' + e.totalScore + ' 分</span></td>' +
+          '<td>' + pcount + ' 人</td>' +
+          '<td style="font-size:12px;">' + validity + '</td>' +
+          '<td><div class="action-btns">' +
+            '<button class="btn btn-outline btn-sm" onclick="showExamEntrance(' + e.id + ')" title="查看入口">🔗</button>' +
+            '<button class="btn btn-primary btn-sm" onclick="editExamMgmt(' + e.id + ')" title="修改">✏️</button>' +
+            (e.status === 'Published'
+              ? '<button class="btn btn-outline btn-sm" onclick="closeExamMgmt(' + e.id + ',\'' + titleEsc + '\')" title="关闭（让考生不可见）">🛑</button>'
+              : '<button class="btn btn-outline btn-sm" disabled title="已关闭" style="opacity:.4;cursor:not-allowed;">🛑</button>') +
+            '<button class="btn btn-success btn-sm" onclick="republishExam(' + e.id + ',\'' + titleEsc + '\')" title="重新发布（克隆+重抽题）">♻️</button>' +
+            '<button class="btn btn-danger btn-sm" onclick="confirmDeleteExam(' + e.id + ',\'' + titleEsc + '\',' + pcount + ')" title="删除">🗑</button>' +
+          '</div></td>' +
+        '</tr>';
+      }
+      tbody.innerHTML = html;
+    }
+
+    async function closeExamMgmt(id, title) {
+      if (!confirm('确定要关闭考试「' + title + '」吗？\n关闭后考生将无法再看到此考试。')) return;
+      try {
+        await api('POST', '/exams/' + id + '/close');
+        toast('已关闭', 'success');
+        loadExams();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // --- 修改考试 ---
+    async function editExamMgmt(id) {
+      try {
+        var d = await api('GET', '/exams/' + id);
+        document.getElementById('eeId').value = id;
+        document.getElementById('eeTitle').value = d.title || '';
+        document.getElementById('eeStartTime').value = d.startTime ? toLocalInput(new Date(d.startTime)) : '';
+        document.getElementById('eeEndTime').value = d.endTime ? toLocalInput(new Date(d.endTime)) : '';
+        document.getElementById('eeTargetMode').value = d.targetMode || 'All';
+        toggleEditTargetUsers(d.targetMode);
+
+        if (d.targetMode === 'Specified') {
+          var users = await api('GET', '/users');
+          var ids = {};
+          for (var i = 0; i < (d.targetUserIds || []).length; i++) ids[d.targetUserIds[i]] = 1;
+          var html = '';
+          for (var j = 0; j < users.length; j++) {
+            var u = users[j];
+            if (u.role !== 'Candidate') continue;
+            html += '<label style="display:inline-flex;align-items:center;margin-right:14px;margin-bottom:6px;font-size:13px;cursor:pointer;">' +
+                    '<input type="checkbox" class="ee-target" value="' + u.id + '"' + (ids[u.id] ? ' checked' : '') + ' style="margin-right:4px;"> ' +
+                    escHtml(u.username) + ' (' + escHtml(u.displayName || '') + ')' +
+                    '</label>';
+          }
+          document.getElementById('eeTargetUsers').innerHTML = html || '<div style="color:var(--text-secondary);font-size:13px;">⚠ 暂无考生账号，请先到「用户管理」新增</div>';
+        }
+        document.getElementById('examEditModal').classList.add('active');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    function toggleEditTargetUsers(mode) {
+      document.getElementById('eeTargetUsersPanel').style.display = mode === 'Specified' ? '' : 'none';
+    }
+
+    function closeExamEdit() { document.getElementById('examEditModal').classList.remove('active'); }
+
+    async function saveExamEdit() {
+      var id = document.getElementById('eeId').value;
+      var title = document.getElementById('eeTitle').value.trim();
+      var start = document.getElementById('eeStartTime').value;
+      var end = document.getElementById('eeEndTime').value;
+      var mode = document.getElementById('eeTargetMode').value;
+      if (!title) { toast('请填写考试标题', 'error'); return; }
+      if (!start || !end) { toast('请设置起止时间', 'error'); return; }
+      if (new Date(end) <= new Date(start)) { toast('结束时间需晚于开始时间', 'error'); return; }
+      var targetIds = [];
+      if (mode === 'Specified') {
+        var checks = document.querySelectorAll('.ee-target:checked');
+        for (var i = 0; i < checks.length; i++) targetIds.push(parseInt(checks[i].value));
+        if (!targetIds.length) { toast('指定人员模式请至少选择 1 名考生', 'error'); return; }
+      }
+      try {
+        await api('PUT', '/exams/' + id, {
+          title: title,
+          startTime: new Date(start).toISOString(),
+          endTime: new Date(end).toISOString(),
+          targetMode: mode,
+          targetUserIds: targetIds
+        });
+        toast('已保存', 'success');
+        closeExamEdit();
+        loadExams();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // --- 删除考试 ---
+    async function confirmDeleteExam(id, title, pcount) {
+      if (pcount > 0) {
+        alert('「' + title + '」已有 ' + pcount + ' 人作答，不能删除！\n\n如需让考生不可见，可使用「关闭」操作。');
+        return;
+      }
+      if (!confirm('确定要删除考试「' + title + '」吗？\n该操作不可撤销！')) return;
+      try {
+        await api('DELETE', '/exams/' + id);
+        toast('已删除', 'success');
+        loadExams();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // --- 重新发布 ---
+    async function republishExam(id, title) {
+      if (!confirm('将基于「' + title + '」重新发布一份新考试：\n\n' +
+                   '· 标题自动加「- 副本」后缀（之后可在「修改」中改名）\n' +
+                   '· 选题规则保留，但会重新随机抽题\n' +
+                   '· 指定人员模式会重新生成新考生密码（覆盖原密码）\n\n继续？')) return;
+      try {
+        var result = await api('POST', '/exams/' + id + '/republish');
+        var msg = '♻️ 重新发布成功！\n\n新考试 ID：' + result.id + '\n新标题：' + result.title + '\n题目数：' + result.totalQuestions;
+        if (result.candidatePassword) msg += '\n新考生密码：' + result.candidatePassword;
+        alert(msg);
+        loadExams();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // --- 查看入口 ---
+    async function showExamEntrance(id) {
+      try {
+        var d = await api('GET', '/exams/' + id + '/entrance');
+        var statusText = d.status === 'Published' ? '进行中' : d.status === 'Closed' ? '已关闭' : d.status;
+        var statusColor = d.status === 'Published' ? 'background:#e6f7ff;color:#1890ff;' : 'background:#f0f0f0;color:#666;';
+        var fullUrl = window.location.origin + d.frontendUrl;
+        var pwdEsc = (d.candidatePassword || '').replace(/'/g, "\\'");
+        var urlEsc = fullUrl.replace(/'/g, "\\'");
+
+        var html = '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">考试标题</div>' +
+          '<div style="font-size:16px;font-weight:600;">' + escHtml(d.title) +
+            ' <span class="tag" style="margin-left:6px;' + statusColor + '">' + statusText + '</span></div>' +
+        '</div>' +
+        '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">考生入口（登录后自动看到此考试）</div>' +
+          '<div style="display:flex;gap:8px;align-items:center;">' +
+            '<input type="text" readonly value="' + escHtml(fullUrl) + '" style="flex:1;font-family:monospace;">' +
+            '<button class="btn btn-primary btn-sm" onclick="copyToClipboard(\'' + urlEsc + '\', this)">📋 复制</button>' +
+          '</div>' +
+        '</div>';
+
+        if (d.targetMode === 'Specified') {
+          html += '<div style="margin-bottom:14px;">' +
+            '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">考生统一登录密码（分享给考生）</div>' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+              '<input type="text" readonly value="' + escHtml(d.candidatePassword || '') + '" style="flex:1;font-family:monospace;font-weight:600;color:var(--danger);">' +
+              '<button class="btn btn-primary btn-sm" onclick="copyToClipboard(\'' + pwdEsc + '\', this)">📋 复制</button>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">考生名单（用户名 = 工号，密码如上）</div>' +
+            '<div class="table-wrap" style="max-height:240px;overflow-y:auto;"><table><thead><tr><th>#</th><th>用户名</th><th>姓名</th><th>部门</th></tr></thead><tbody>';
+          var users = d.targetUsers || [];
+          for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            html += '<tr><td>' + (i + 1) + '</td><td><strong>' + escHtml(u.username) + '</strong></td><td>' + escHtml(u.displayName || '') + '</td><td>' + escHtml(u.department || '-') + '</td></tr>';
+          }
+          html += '</tbody></table></div></div>';
+        } else {
+          html += '<div style="padding:10px 14px;background:var(--bg);border-radius:6px;color:var(--text-secondary);font-size:13px;">📌 此考试为「全员可考」模式，所有考生登录后即可在「考试列表」中看到。</div>';
+        }
+        document.getElementById('entranceBody').innerHTML = html;
+        document.getElementById('examEntranceModal').classList.add('active');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    function closeExamEntrance() { document.getElementById('examEntranceModal').classList.remove('active'); }
+
+    function copyToClipboard(text, btn) {
+      var done = function() {
+        var orig = btn.textContent;
+        btn.textContent = '✅ 已复制';
+        setTimeout(function() { btn.textContent = orig; }, 1500);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function() { fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    }
+    function fallbackCopy(text, done) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch(e) { toast('复制失败，请手动复制', 'error'); }
+      document.body.removeChild(ta);
     }
 
     // ==================== 历史记录 ====================
