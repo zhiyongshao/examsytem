@@ -35,6 +35,9 @@
         <div class="admin-sidebar-item" data-tab="history" onclick="switchTab('history')" data-page-node-id="YV9RGbxFKaspgw0TgNS03C">
           <span data-page-node-id="WpOAGbAsfftsKWs95BtEaP">📊</span><span data-page-node-id="m9RrsphoYzD6SpX0Mkys6J">历史记录</span>
         </div>
+        <div class="admin-sidebar-item" data-tab="monitor" onclick="switchTab('monitor')" data-page-node-id="zK3mN1oPqLr8xVw2YtB7cD">
+          <span data-page-node-id="Qw2eR4tY8uI0oP1aS3dF5g">📡</span><span data-page-node-id="H7jK9lM2nB4vC6xZ8qW0eR">考试监控</span>
+        </div>
       </aside>
       <main class="admin-main" data-page-node-id="Z5k5RSlqCIGnfMj48EHBQ1">
 
@@ -204,6 +207,35 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== Tab5：考试监控（监考看板）===== -->
+    <div id="tabMonitor" style="display:none;" data-page-node-id="Lm4nB7vC2xK9pQ3wR6tY8u">
+      <div class="card" data-page-node-id="Np5qW8xR2cV4bY7zK1mT3e">
+        <h3 style="margin-bottom:8px;" data-page-node-id="Bv6cX9nM3qL5wR8tY2uK4p">📡 考试实时监控</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" data-page-node-id="Cx7dF2mN4qL6wR9tY3uK5p">
+          选择一场考试，实时查看考生的<b>登录状态</b>（未登陆 / 未开始 / 考试中 / 已交卷）与<b>分数</b>；考试结束后自动按全员分数排名。
+        </p>
+        <div class="toolbar" data-page-node-id="Dz8eG3nO5qM7wR0tY4uK6p">
+          <select id="monitorExamSelect" onchange="onMonitorExamChange()" data-page-node-id="Ea9fH4nP6qN8wR1tY5uL7p" style="min-width:260px;"></select>
+          <span id="monitorSummary" data-page-node-id="Fb0gI5nQ7qO9wR2tY6uM8p" style="font-size:13px;color:var(--text-secondary);"></span>
+          <span class="tag tag-live" id="monitorLiveTag" data-page-node-id="Gc1hJ6nR8qP0wR3tY7uN9p" style="display:none;background:#e6f7ff;color:#1890ff;">● 实时刷新中</span>
+        </div>
+      </div>
+      <div class="table-wrap" data-page-node-id="Hd2iK7nS9qQ1wR4tY8uO0p" style="margin-top:12px;">
+        <table data-page-node-id="Ie3jL8nT0qR2wR5tY9uP1p">
+          <thead data-page-node-id="Jf4kM9nU1qS3wR6tY0uQ2p"><tr data-page-node-id="Kg5lN0nV2qT4wR7tY1uR3p">
+            <th data-page-node-id="Lh6mO1nW3qU5wR8tY2uS4p">#</th>
+            <th data-page-node-id="Mi7nP2nX4qV6wR9tY3uT5p">姓名</th>
+            <th data-page-node-id="Nj8oQ3nY5qW7wR0tY4uU6p">工号</th>
+            <th data-page-node-id="Ok9pR4nZ6qX8wR1tY5uV7p">部门</th>
+            <th data-page-node-id="Pl0qS5nA7qY9wR2tY6uW8p">状态</th>
+            <th data-page-node-id="Qm1rT6nB8qZ0wR3tY7uX9p">得分</th>
+            <th data-page-node-id="Rn2sU7nC9qA1wR4tY8uY0p">排名</th>
+          </tr></thead>
+          <tbody id="monitorBody" data-page-node-id="So3tV8nD0qB2wR5tY9uZ1p"><tr data-page-node-id="Tp4uW9nE1qC3wR6tY0uA2p"><td colspan="7" class="empty-state" data-page-node-id="Uq5vX0nF2qD4wR7tY1uB3p">请选择一场考试</td></tr></tbody>
+        </table>
+      </div>
+    </div>
       </main>
     </div>
   </div>
@@ -355,8 +387,8 @@
     </div>
   </div>
 
-<script src="app.js?v=3"></script>
-<script src="admin.js?v=2"></script>
+  <script src="app.js?v=3"></script>
+  <script src="admin.js?v=3"></script>
 
   <!-- Scope datalist -->
   <datalist id="scopeList" data-page-node-id="JolJjjeHusnNYe2HvK5Xiq"></datalist>

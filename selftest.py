@@ -1,4 +1,4 @@
-import urllib.request, json, sys, urllib.parse
+import urllib.request, json, sys, urllib.parse, datetime
 
 BASE = "http://localhost:5000"
 
@@ -252,6 +252,88 @@ ids_b = [q["id"] for q in b["questions"]]
 ids_c = [q["id"] for q in c["questions"]]
 diff = (ids_a != ids_b) or (ids_b != ids_c) or (ids_a != ids_c)
 check("随机卷-不同考生卷面不同", diff, f"a={ids_a} b={ids_b} c={ids_c}")
+
+# ============ 18. 账号类型 & 登录时间窗 & 监考看板 ============
+NOW = datetime.datetime.utcnow()
+def ISO(dt): return dt.strftime("%Y-%m-%dT%H:%M:%S")
+future_start, future_end = ISO(NOW + datetime.timedelta(hours=2)), ISO(NOW + datetime.timedelta(hours=3))
+past_start,   past_end   = ISO(NOW - datetime.timedelta(hours=1)), ISO(NOW + datetime.timedelta(hours=3))
+ended_start,  ended_end  = ISO(NOW - datetime.timedelta(hours=3)), ISO(NOW - datetime.timedelta(hours=2))
+
+def import_candidate(name, job):
+    csv = "姓名,工号,部门\n" + job + "," + job + ",测试部\n"
+    boundary = "----bcand"
+    raw = ("--%s\r\n" % boundary).encode()
+    raw += b'Content-Disposition: form-data; name="file"; filename="c.csv"\r\n'
+    raw += b"Content-Type: text/csv\r\n\r\n"
+    raw += csv.encode("utf-8") + b"\r\n"
+    raw += ("--%s--\r\n" % boundary).encode()
+    st, body = req("POST", "/api/users/import", raw=raw,
+                   ctype="multipart/form-data; boundary=%s" % boundary, token=admin)
+    return j(body)
+
+def publish_specified(title, start, end, jobs):
+    uids = []
+    for job in jobs:
+        imp = import_candidate(title, job)
+        uids.append(imp["items"][0]["id"])
+    st, body = req("POST", "/api/exams", {
+        "Title": title, "DurationMinutes": 30,
+        "TargetMode": "Specified", "TargetUserIds": uids,
+        "Rules": [{"Scope1": "数学", "Type": "Single", "Count": 2, "ScorePerQuestion": 5}],
+        "StartTime": start, "EndTime": end
+    }, token=admin)
+    return st, j(body)
+
+# 18a. 未来考试：窗口外登录应被拒（401）
+st_f, body_f = publish_specified("未来考试", future_start, future_end, ["FUTUREU"])
+pwd_f = body_f.get("candidatePassword")
+check("未来考试-发布成功且有统一密码", st_f == 200 and bool(pwd_f), f"status={st_f} pwd={pwd_f}")
+st, body = req("POST", "/api/auth/login", {"Username": "FUTUREU", "Password": pwd_f})
+check("未来考试-窗口外登录被拒(401)", st == 401, f"status={st} body={body[:80]}")
+
+# 18b. 进行中考试：窗口内可登录(200)；另含一名永不登录的考生用于'未登陆'校验
+st_p, body_p = publish_specified("进行中考试", past_start, past_end, ["WITHINU", "NEVERU"])
+pwd_p = body_p.get("candidatePassword")
+pid = body_p["id"]
+st, body = req("POST", "/api/auth/login", {"Username": "WITHINU", "Password": pwd_p})
+check("进行中考试-窗口内登录成功(200)", st == 200, f"status={st} body={body[:80]}")
+# General 账号（seed student1）不受时间窗限制
+st, body = req("POST", "/api/auth/login", {"Username": "student1", "Password": "student1"})
+check("General账号-不受登录时间窗限制", st == 200, f"status={st}")
+
+# 18c. 已结束考试：登录应被拒（401）
+st_e, body_e = publish_specified("已结束考试", ended_start, ended_end, ["ENDEDU"])
+pwd_e = body_e.get("candidatePassword")
+st, body = req("POST", "/api/auth/login", {"Username": "ENDEDU", "Password": pwd_e})
+check("已结束考试-登录被拒(401)", st == 401, f"status={st} body={body[:80]}")
+
+# 18d. 监考看板：WITHINU 已登录未作答=未开始；NEVERU=未登陆
+st, body = req("GET", f"/api/exams/{pid}/monitor", token=admin)
+mon = j(body)
+check("监考-候选名单含2人", st == 200 and mon["totalCandidates"] == 2, f"n={mon.get('totalCandidates')} body={str(mon)[:120]}")
+def _find(lst, un): return next((c for c in lst if c["username"] == un), None)
+wu = _find(mon["candidates"], "WITHINU")
+nv = _find(mon["candidates"], "NEVERU")
+check("监考-WITHINU状态=未开始", wu and wu["status"] == "未开始", f"wu={wu}")
+check("监考-NEVERU状态=未登陆", nv and nv["status"] == "未登陆", f"nv={nv}")
+
+# 18e. WITHINU 开始=考试中，交卷=已交卷+分数+排名
+wtok = j(req("POST", "/api/auth/login", {"Username": "WITHINU", "Password": pwd_p})[1])["token"]
+st, body = req("POST", f"/api/exams/{pid}/start", token=wtok)
+pstart = j(body)
+ans = []
+for q in pstart["questions"]:
+    st2, b2 = req("GET", f"/api/questions/{q['id']}", token=admin)
+    ans.append({"QuestionId": q["id"], "Selected": j(b2)["answer"]})
+req("POST", f"/api/exams/{pid}/submit", {"Answers": ans, "Early": True}, token=wtok)
+st, body = req("GET", f"/api/exams/{pid}/monitor", token=admin)
+mon2 = j(body)
+wu2 = _find(mon2["candidates"], "WITHINU")
+check("监考-WITHINU交卷后=已交卷", wu2 and wu2["status"] == "已交卷", f"wu2={wu2}")
+check("监考-WITHINU得分=总分", wu2 and wu2["score"] == mon2["totalScore"], f"score={wu2.get('score')} total={mon2.get('totalScore')}")
+check("监考-WITHINU排名第1", wu2 and wu2["rank"] == 1, f"rank={wu2.get('rank')}")
+check("监考-已交卷计数=1", mon2["submittedCount"] == 1, f"sub={mon2['submittedCount']}")
 
 print("\n==== 自测完成，失败项：%d ====" % FAILED)
 sys.exit(1 if FAILED else 0)

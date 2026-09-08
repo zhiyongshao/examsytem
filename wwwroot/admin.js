@@ -39,6 +39,7 @@
       document.getElementById('tabPublish').style.display   = tab === 'publish'   ? '' : 'none';
       document.getElementById('tabExams').style.display     = tab === 'exams'     ? '' : 'none';
       document.getElementById('tabHistory').style.display   = tab === 'history'   ? '' : 'none';
+      document.getElementById('tabMonitor').style.display   = tab === 'monitor'   ? '' : 'none';
       // 同步顶部 tab 按钮
       var topBtns = document.querySelectorAll('#tabBar button');
       for (var i = 0; i < topBtns.length; i++) {
@@ -61,6 +62,93 @@
           loadExams();
         }
       }
+      if (tab === 'monitor') { loadMonitorExams(); }
+      else { stopMonitorPolling(); }
+    }
+
+    // ==================== 考试监控（监考看板）====================
+    var monitorTimer = null;
+    var monitorExamId = null;
+
+    async function loadMonitorExams() {
+      try {
+        var list = await api('GET', '/exams');
+        var sel = document.getElementById('monitorExamSelect');
+        if (!list || !list.length) {
+          sel.innerHTML = '<option value="">暂无考试</option>';
+          document.getElementById('monitorBody').innerHTML = '<tr><td colspan="7" class="empty-state">暂无考试</td></tr>';
+          document.getElementById('monitorSummary').textContent = '';
+          return;
+        }
+        // 默认优先显示进行中的，其次按 ID 倒序
+        list.sort(function(a, b) {
+          if (a.status === 'Published' && b.status !== 'Published') return -1;
+          if (b.status === 'Published' && a.status !== 'Published') return 1;
+          return b.id - a.id;
+        });
+        sel.innerHTML = list.map(function(e) {
+          var tag = e.status === 'Published' ? '（进行中）' : '（已关闭）';
+          return '<option value="' + e.id + '">' + escHtml(e.title) + tag + '</option>';
+        }).join('');
+        monitorExamId = sel.value;
+        startMonitorPolling();
+      } catch(e) { toast('加载考试列表失败：' + e.message, 'error'); }
+    }
+
+    function onMonitorExamChange() {
+      monitorExamId = document.getElementById('monitorExamSelect').value;
+      startMonitorPolling();
+    }
+
+    function startMonitorPolling() {
+      stopMonitorPolling();
+      if (!monitorExamId) return;
+      document.getElementById('monitorLiveTag').style.display = '';
+      loadMonitorOnce();
+      monitorTimer = setInterval(loadMonitorOnce, 3000);
+    }
+
+    function stopMonitorPolling() {
+      if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
+      var tag = document.getElementById('monitorLiveTag');
+      if (tag) tag.style.display = 'none';
+    }
+
+    async function loadMonitorOnce() {
+      if (!monitorExamId) return;
+      try {
+        var d = await api('GET', '/exams/' + monitorExamId + '/monitor');
+        renderMonitor(d);
+      } catch(e) { console.error('[Monitor] error:', e); }
+    }
+
+    function renderMonitor(d) {
+      var sum = document.getElementById('monitorSummary');
+      sum.innerHTML = '应到 <b>' + d.totalCandidates + '</b> · 已登录 <b>' + d.loggedInCount + '</b> · 考试中 <b>' + d.inProgressCount + '</b> · 已交卷 <b>' + d.submittedCount + '</b>'
+        + (d.isEnded ? ' · <span style="color:var(--danger);">已结束（已自动排名）</span>' : '');
+
+      var rows = '';
+      for (var i = 0; i < d.candidates.length; i++) {
+        var c = d.candidates[i];
+        var statusBadge;
+        if (c.status === '已交卷') statusBadge = '<span class="tag" style="background:#f6ffed;color:#52c41a;">已交卷</span>';
+        else if (c.status === '考试中') statusBadge = '<span class="tag" style="background:#e6f7ff;color:#1890ff;">考试中</span>';
+        else if (c.status === '未开始') statusBadge = '<span class="tag" style="background:#fff7e6;color:#fa8c16;">未开始</span>';
+        else statusBadge = '<span class="tag tag-scope">未登陆</span>';
+        var score = c.status === '已交卷' ? (c.score + ' / ' + d.totalScore) : '—';
+        var rank = c.rank ? ('第 ' + c.rank + ' 名') : '—';
+        rows += '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td><strong>' + escHtml(c.displayName || c.username) + '</strong></td>' +
+          '<td>' + escHtml(c.jobNo || '-') + '</td>' +
+          '<td>' + escHtml(c.department || '-') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td>' + score + '</td>' +
+          '<td>' + rank + '</td>' +
+        '</tr>';
+      }
+      if (!d.candidates.length) rows = '<tr><td colspan="7" class="empty-state">无考生</td></tr>';
+      document.getElementById('monitorBody').innerHTML = rows;
     }
 
     // ==================== 题库管理 ====================

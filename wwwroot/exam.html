@@ -30,6 +30,24 @@
     </div>
   </div>
 
+  <!-- ===== 页面1.5：考前等待（倒计时）页 ===== -->
+  <div id="pageWait" style="display:none;">
+    <div class="container">
+      <div class="card result-card" id="waitCard" style="text-align:center;">
+        <div style="font-size:15px;color:var(--text-secondary);margin-bottom:6px;">考试即将开始</div>
+        <h2 id="waitTitle" style="margin:0 0 14px;"></h2>
+        <div id="waitInfo" style="font-size:13px;color:var(--text-secondary);line-height:1.9;margin-bottom:18px;"></div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-bottom:6px;">⏳ 距考试开始还有</div>
+        <div id="waitCountdown" style="font-size:46px;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums;letter-spacing:2px;">--:--</div>
+        <button class="btn btn-primary" id="waitEnterBtn" style="margin-top:20px;" disabled onclick="startExam(currentWaitId)">进入考试</button>
+        <div id="waitHint" style="font-size:12px;color:var(--text-secondary);margin-top:10px;">考试开始前10分钟已开放登录；开始后即可进入作答</div>
+      </div>
+      <div style="margin-top:20px;text-align:center;">
+        <button class="btn btn-outline" onclick="backToList()">← 返回考试列表</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== 页面2：答题页 ===== -->
   <div id="pageExam" style="display:none;">
     <!-- 倒计时 -->
@@ -70,6 +88,9 @@
     let timerInterval = null;
     let remainingSeconds = 0;
     let draftAnswers = {};
+    let currentWaitId = null;     // 当前等待页对应的考试 ID
+    let waitTimer = null;         // 等待页倒计时定时器
+    const PRE_WINDOW_MIN = 10;    // 考前允许登录/进入等待页的分钟数
 
     // ---- 初始化 ----
     (function init() {
@@ -85,21 +106,25 @@
 
     function showPage(page) {
       $('#pageList').style.display   = page === 'list' ? '' : 'none';
+      $('#pageWait').style.display   = page === 'wait' ? '' : 'none';
       $('#pageExam').style.display   = page === 'exam' ? '' : 'none';
       $('#pageResult').style.display = page === 'result' ? '' : 'none';
       $('#timerBar').style.display   = page === 'exam' ? '' : 'none';
       $('#submitBar').style.display  = page === 'exam' ? '' : 'none';
       if (page === 'list') $('#navTitle').textContent = '📋 可用考试';
+      if (page === 'wait') $('#navTitle').textContent = '⏳ 考前等待';
       if (page === 'exam') $('#navTitle').textContent = '📝 正在答题';
       if (page === 'result') $('#navTitle').textContent = '📊 考试结果';
     }
 
     // ---- 加载考试列表 ----
+    let examListCache = [];
     async function loadExams() {
       try {
         const list = await api('GET', '/exams/available');
+        examListCache = list || [];
         const el = $('#examList');
-        if (!list.length) {
+        if (!examListCache.length) {
           el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无可用考试</p><p style="font-size:12px;margin-top:4px;">请等待管理员发布考试</p></div>';
           return;
         }
@@ -107,13 +132,22 @@
         el.innerHTML = list.map(ex => {
           const start = ex.startTime ? new Date(ex.startTime).getTime() : 0;
           const end = ex.endTime ? new Date(ex.endTime).getTime() : 0;
-          let clickable = true, label = '进入考试', cls = 'status-pending';
-          if (start && now < start) { clickable = false; label = '未开始'; cls = 'status-started'; }
-          else if (end && now >= end) { clickable = false; label = '已结束'; cls = 'status-started'; }
+          const loginOpen = start ? start - PRE_WINDOW_MIN * 60000 : 0; // 考前 10 分钟开放
+          let clickable = true, label = '进入考试', cls = 'status-pending', action = `onclick="startExam(${ex.id})"`;
+          if (end && now >= end) { clickable = false; label = '已结束'; cls = 'status-started'; }
+          else if (start && now < start) {
+            if (loginOpen && now >= loginOpen) {
+              // 考前 10 分钟窗口内：可进入等待页（倒计时）
+              clickable = true; label = '即将开始'; cls = 'status-started';
+              action = `onclick="openWait(${ex.id})"`;
+            } else {
+              clickable = false; label = '未开始'; cls = 'status-started';
+            }
+          }
           const timeStr = ex.startTime ? new Date(ex.startTime).toLocaleString() : '-';
           const endStr = ex.endTime ? new Date(ex.endTime).toLocaleString() : '-';
           return `
-          <li class="exam-item" ${clickable ? `onclick="startExam(${ex.id})"` : ''}>
+          <li class="exam-item" ${clickable ? action : ''}>
             <div class="exam-info">
               <div class="exam-title">${escHtml(ex.title)}</div>
               <div class="exam-meta">
@@ -126,6 +160,43 @@
           </li>`;
         }).join('');
       } catch(e) { toast('加载失败：' + e.message, 'error'); }
+    }
+
+    // ---- 考前等待页（倒计时）----
+    function openWait(examId) {
+      const ex = (examListCache || []).find(e => e.id === examId) || null;
+      if (!ex) { toast('未找到考试信息', 'error'); return; }
+      currentWaitId = examId;
+      $('#waitTitle').textContent = ex.title || '考试';
+      const timeStr = ex.startTime ? new Date(ex.startTime).toLocaleString() : '-';
+      const endStr = ex.endTime ? new Date(ex.endTime).toLocaleString() : '-';
+      $('#waitInfo').innerHTML =
+        `考试时长：<b>${ex.durationMinutes}</b> 分钟　·　总分：<b>${ex.totalScore}</b> 分<br>` +
+        `开始时间：${timeStr}<br>结束时间：${endStr}`;
+      showPage('wait');
+      startWaitCountdown(ex);
+    }
+
+    function startWaitCountdown(ex) {
+      if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
+      const startMs = ex.startTime ? new Date(ex.startTime).getTime() : 0;
+      const btn = $('#waitEnterBtn');
+      const update = () => {
+        const remain = startMs - Date.now();
+        if (remain <= 0) {
+          $('#waitCountdown').textContent = '00:00';
+          btn.disabled = false;
+          if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
+          return;
+        }
+        const totalSec = Math.floor(remain / 1000);
+        const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+        const s = (totalSec % 60).toString().padStart(2, '0');
+        $('#waitCountdown').textContent = `${m}:${s}`;
+        btn.disabled = true;
+      };
+      update();
+      waitTimer = setInterval(update, 1000);
     }
 
     // ---- 开始考试 ----
@@ -263,6 +334,7 @@
     }
 
     function backToList() {
+      if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
       if (rankingConn) { rankingConn.stop(); rankingConn = null; }
       showPage('list');
       loadExams();

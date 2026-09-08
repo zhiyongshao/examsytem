@@ -25,6 +25,16 @@ if not os.path.exists(DOTNET):
 DB = os.path.join(HERE, "selftest_run.db")
 ASSETS = os.path.join(HERE, "obj", "project.assets.json")
 
+# 根因修复：.NET SDK 8.0.424 在"还原"阶段若临时目录(TEMP)与项目不在同一盘符会偶发抛
+#   NuGet.targets(745,5): Value cannot be null. (Parameter 'path1')
+# 项目在 F: 盘，系统 TEMP 通常在 C: 盘 → 跨盘触发。这里把 TEMP/TMP 钉到同盘目录，彻底规避。
+_SAME_DRIVE_TMP = os.path.join(HERE, "..", ".nuget", "tmp")
+try:
+    os.makedirs(_SAME_DRIVE_TMP, exist_ok=True)
+    os.environ["TEMP"] = os.environ["TMP"] = os.path.abspath(_SAME_DRIVE_TMP)
+except Exception:
+    pass
+
 
 def cleanup_db():
     for ext in ("", "-wal", "-shm"):
