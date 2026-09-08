@@ -43,6 +43,7 @@ public class UserService : IUserService
                 existing.DisplayName = displayName;
                 existing.JobNo = jobNo;
                 existing.Department = dept;
+                existing.AccountType = UserAccountType.Exam; // 导入即考试账号：仅考试时间窗内可登录
                 result.Updated++;
                 touched.Add((existing, displayName));
             }
@@ -55,7 +56,8 @@ public class UserService : IUserService
                     JobNo = jobNo,
                     Department = dept,
                     PasswordHash = PasswordHelper.Hash(tempPwd),
-                    Role = UserRole.Candidate
+                    Role = UserRole.Candidate,
+                    AccountType = UserAccountType.Exam // 导入即考试账号：仅考试时间窗内可登录
                 };
                 _db.Users.Add(u);
                 result.Created++;

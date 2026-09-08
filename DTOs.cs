@@ -24,6 +24,7 @@ public class CreateUserRequest
     [Required] public string Password { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public UserRole Role { get; set; } = UserRole.Candidate;
+    public UserAccountType AccountType { get; set; } = UserAccountType.General; // 默认无限制；导入考生时置 Exam
 }
 
 public class UpdateUserRequest
@@ -51,6 +52,7 @@ public class UserBrief
     public string Username { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string Role { get; set; } = "";
+    public string AccountType { get; set; } = ""; // General / Exam
     public string? JobNo { get; set; }
     public string? Department { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -301,4 +303,36 @@ public class ResultRow
     public double DurationSeconds { get; set; }
     public string Result { get; set; } = ""; // 合格/不合格
     public DateTime SubmitTime { get; set; }
+}
+
+// ===== 考试实时监控（监考看板）=====
+/// <summary>单个考生的实时状态。Status：未登陆 / 未开始 / 考试中 / 已交卷。</summary>
+public class MonitorCandidateDto
+{
+    public int UserId { get; set; }
+    public string Username { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string? JobNo { get; set; }
+    public string? Department { get; set; }
+    public string Status { get; set; } = ""; // 未登陆 / 未开始 / 考试中 / 已交卷
+    public double Score { get; set; }
+    public int? Rank { get; set; }
+}
+
+public class ExamMonitorDto
+{
+    public int ExamId { get; set; }
+    public string Title { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string PaperMode { get; set; } = ""; // Fixed / PerCandidate
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public int DurationMinutes { get; set; }
+    public int TotalScore { get; set; }
+    public bool IsEnded { get; set; } // 是否已过结束时间（之后自动按全员分数排名）
+    public int TotalCandidates { get; set; }  // 应到
+    public int LoggedInCount { get; set; }    // 已登录（未登陆之外）
+    public int InProgressCount { get; set; }  // 考试中
+    public int SubmittedCount { get; set; }   // 已交卷
+    public List<MonitorCandidateDto> Candidates { get; set; } = new();
 }

@@ -31,6 +31,7 @@ public class UsersController : ControllerBase
                 Username = u.Username,
                 DisplayName = u.DisplayName,
                 Role = u.Role.ToString(),
+                AccountType = u.AccountType.ToString(),
                 JobNo = u.JobNo,
                 Department = u.Department,
                 CreatedAt = u.CreatedAt
@@ -52,11 +53,12 @@ public class UsersController : ControllerBase
             Username = req.Username,
             PasswordHash = PasswordHelper.Hash(req.Password),
             DisplayName = string.IsNullOrWhiteSpace(req.DisplayName) ? req.Username : req.DisplayName,
-            Role = req.Role
+            Role = req.Role,
+            AccountType = req.AccountType
         };
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
-        return Ok(new UserBrief { Id = user.Id, Username = user.Username, DisplayName = user.DisplayName, Role = user.Role.ToString() });
+        return Ok(new UserBrief { Id = user.Id, Username = user.Username, DisplayName = user.DisplayName, Role = user.Role.ToString(), AccountType = user.AccountType.ToString() });
     }
 
     // 修改用户信息（姓名/工号/部门/角色）
@@ -79,16 +81,17 @@ public class UsersController : ControllerBase
         if (req.Role.HasValue) user.Role = req.Role.Value;
 
         await _db.SaveChangesAsync();
-        return Ok(new UserBrief
-        {
-            Id = user.Id,
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            Role = user.Role.ToString(),
-            JobNo = user.JobNo,
-            Department = user.Department,
-            CreatedAt = user.CreatedAt
-        });
+            return Ok(new UserBrief
+            {
+                Id = user.Id,
+                Username = user.Username,
+                DisplayName = user.DisplayName,
+                Role = user.Role.ToString(),
+                AccountType = user.AccountType.ToString(),
+                JobNo = user.JobNo,
+                Department = user.Department,
+                CreatedAt = user.CreatedAt
+            });
     }
 
     // 删除用户

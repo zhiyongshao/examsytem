@@ -44,6 +44,15 @@ public enum SessionStatus
     Expired = 3
 }
 
+/// <summary>账号类型。
+/// General = 在「用户管理」中手动创建，无登录有效期限制，任何时间都可登录；
+/// Exam = 发布考试时由考生名单导入自动创建，仅允许在考试前 10 分钟至考试结束的时间窗内登录。</summary>
+public enum UserAccountType
+{
+    General = 0,
+    Exam = 1
+}
+
 // ===== 实体 =====
 public class User
 {
@@ -54,7 +63,9 @@ public class User
     public string? JobNo { get; set; }          // 工号（考生名单导入）
     public string? Department { get; set; }     // 部门（考生名单导入）
     public UserRole Role { get; set; } = UserRole.Candidate;
+    public UserAccountType AccountType { get; set; } = UserAccountType.General; // General=用户管理创建(无限制) / Exam=导入考生(时间窗限制)
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastLoginAt { get; set; } // 最近一次成功登录时间（监考看板判定"未登陆/未开始"用）
 }
 
 /// <summary>

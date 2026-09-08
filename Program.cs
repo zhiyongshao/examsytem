@@ -106,6 +106,8 @@ using (var scope = app.Services.CreateScope())
     EnsureColumn(db, "Exams", "CandidatePassword", "TEXT");
     EnsureColumn(db, "Exams", "PaperMode", "INTEGER NOT NULL DEFAULT 0");
     EnsureColumn(db, "ExamQuestions", "SessionId", "INTEGER");
+    EnsureColumn(db, "Users", "AccountType", "INTEGER NOT NULL DEFAULT 0");
+    EnsureColumn(db, "Users", "LastLoginAt", "TEXT");
     Seed(db);
 }
 
