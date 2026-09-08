@@ -24,6 +24,7 @@
         loadScopes();
         loadQuestions();
         loadHistory();
+        loadExams();
         initMatrix();
         initExamTimes();
       } catch(err) {
@@ -51,7 +52,15 @@
         s.className = s.getAttribute('data-tab') === tab ? 'admin-sidebar-item active' : 'admin-sidebar-item';
       }
       if (tab === 'history') loadHistory();
-      if (tab === 'exams') loadExams();
+      if (tab === 'exams') {
+        var examBody = document.getElementById('examMgmtBody');
+        // 防御：若 tbody 仍是初始"加载中..."（老缓存/admin.js 旧版本导致 loadExams 缺失），强制 reload
+        if (examBody && examBody.textContent.indexOf('加载中') !== -1) {
+          try { location.reload(); return; } catch(e) { loadExams(); }
+        } else {
+          loadExams();
+        }
+      }
     }
 
     // ==================== 题库管理 ====================

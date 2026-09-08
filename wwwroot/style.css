@@ -319,8 +319,18 @@ tr:hover td { background: #fafafa; }
     color: var(--text);
     cursor: pointer;
     transition: background .15s;
+    /* 锁高 + 锁 baseline，避免激活态 font-weight 变化导致图标/文字上下偏移 */
+    height: 48px;
+    line-height: 24px;
     font-size: 15px;
+    font-weight: 500;
     border-left: 3px solid transparent;
+    box-sizing: border-box;
+  }
+  .admin-sidebar-item > span {
+    line-height: 24px;
+    display: inline-flex;
+    align-items: center;
   }
   .admin-sidebar-item:hover { background: var(--bg); }
   .admin-sidebar-item.active {

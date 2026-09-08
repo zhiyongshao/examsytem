@@ -1,198 +1,198 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<html lang="zh-CN" data-page-node-id="rHpH6j14FteHwE8DuAD0nO">
+<head data-page-node-id="pFAeBev57x53VNUhYfpmSj">
+  <meta charset="UTF-8" data-page-node-id="b9vbCpi4DbnCfM3K6TAzM4">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" data-page-node-id="XDFAjOOuMBD9h13YLN6H4W">
   <title>在线考试系统 - 管理后台</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2" data-page-node-id="qKlZZRAJLqiaXNlNC2buxD">
 </head>
-<body>
+<body data-page-node-id="lbKtLeZZTujDVGfKHdH8gF">
   <!-- 导航栏 -->
-  <nav class="navbar" id="navbar">
-    <span class="title">🛠 管理后台</span>
-    <div class="user-info">
-      <button class="btn-logout" onclick="openUserMgmt()" title="用户管理">👥 用户管理</button>
-      <button class="btn-logout" onclick="openMyPassword()" title="修改我的密码">🔑 我的密码</button>
-      <span id="userName"></span>
-      <button class="btn-logout" onclick="logout()">退出</button>
+  <nav class="navbar" id="navbar" data-page-node-id="6rPIDrpRaxIZcEEpdsT8bN">
+    <span class="title" data-page-node-id="MtrLFLViON2cH4Sa5mmdsb">🛠 管理后台</span>
+    <div class="user-info" data-page-node-id="IdfUeq7cVwwJ5WaRENhepu">
+      <button class="btn-logout" onclick="openUserMgmt()" title="用户管理" data-page-node-id="MEgAP3Gt98k1T1WgOqFgZO">👥 用户管理</button>
+      <button class="btn-logout" onclick="openMyPassword()" title="修改我的密码" data-page-node-id="s7Aik3LAaDAiEmfeWjFSKP">🔑 我的密码</button>
+      <span id="userName" data-page-node-id="aDXMYavL2k6RzAu7yebAGg"></span>
+      <button class="btn-logout" onclick="logout()" data-page-node-id="BPqTRohCUPqOzCBypO6g4A">退出</button>
     </div>
   </nav>
 
   <!-- Tab 切换 -->
-  <div class="container" style="padding-top:16px;">
-    <div class="admin-layout">
+  <div class="container" style="padding-top:16px;" data-page-node-id="CwfUGYjva6uPtvwc5JEXf7">
+    <div class="admin-layout" data-page-node-id="rPP8z8wQbg02t2OwkTDPjc">
       <!-- 桌面端侧边栏 -->
-      <aside class="admin-sidebar" id="adminSidebar">
-        <div class="admin-sidebar-item active" data-tab="questions" onclick="switchTab('questions')">
-          <span>📚</span><span>题库管理</span>
+      <aside class="admin-sidebar" id="adminSidebar" data-page-node-id="84AvRTwfVDG62FsWPtcsJP">
+        <div class="admin-sidebar-item active" data-tab="questions" onclick="switchTab('questions')" data-page-node-id="fjwHxZSLHYt0y6TjS2YE2U">
+          <span data-page-node-id="DAEWVXuuB4cvoPcjOjkkah">📚</span><span data-page-node-id="hGFbwCxqJYt4xQA2sscTe4">题库管理</span>
         </div>
-        <div class="admin-sidebar-item" data-tab="publish" onclick="switchTab('publish')">
-          <span>📋</span><span>发布考试</span>
+        <div class="admin-sidebar-item" data-tab="publish" onclick="switchTab('publish')" data-page-node-id="msm3OdhG0Ig46WMGqE5shF">
+          <span data-page-node-id="3bvy81n3OGGQSmoAP9IdP2">📋</span><span data-page-node-id="pBigrsnDV2AEH2ZV4K9PEV">发布考试</span>
         </div>
-        <div class="admin-sidebar-item" data-tab="exams" onclick="switchTab('exams')">
-          <span>📑</span><span>考试管理</span>
+        <div class="admin-sidebar-item" data-tab="exams" onclick="switchTab('exams')" data-page-node-id="02ImEsoWNWP5TwApz4CjYk">
+          <span data-page-node-id="DE2XD9SyIQFifgrnEU0iJc">📑</span><span data-page-node-id="7XoRKm65cbnp4cqYAeqClP">考试管理</span>
         </div>
-        <div class="admin-sidebar-item" data-tab="history" onclick="switchTab('history')">
-          <span>📊</span><span>历史记录</span>
+        <div class="admin-sidebar-item" data-tab="history" onclick="switchTab('history')" data-page-node-id="YV9RGbxFKaspgw0TgNS03C">
+          <span data-page-node-id="WpOAGbAsfftsKWs95BtEaP">📊</span><span data-page-node-id="m9RrsphoYzD6SpX0Mkys6J">历史记录</span>
         </div>
       </aside>
-      <main class="admin-main">
+      <main class="admin-main" data-page-node-id="Z5k5RSlqCIGnfMj48EHBQ1">
 
     <!-- ===== Tab1：题库管理 ===== -->
-    <div id="tabQuestions">
-      <div class="card">
-        <div class="toolbar">
-          <input type="text" id="searchKey" placeholder="🔍 搜索题目内容..." oninput="debounceLoadQuestions()">
-          <select id="filterScope" onchange="loadQuestions()">
-            <option value="">全部范围</option>
+    <div id="tabQuestions" data-page-node-id="46RJYW2qvhWUxZcCxxUgge">
+      <div class="card" data-page-node-id="dbXjwx239SvG27wppaGFtv">
+        <div class="toolbar" data-page-node-id="alAHRtl5jgsLUrK7EP8K5z">
+          <input type="text" id="searchKey" placeholder="🔍 搜索题目内容..." oninput="debounceLoadQuestions()" data-page-node-id="E9BJZIMO8njeGYHAGd6IUu">
+          <select id="filterScope" onchange="loadQuestions()" data-page-node-id="oEtOZPVhzLV8bcXYHASo6b">
+            <option value="" data-page-node-id="9XuZUWoGq7lX4qNrb21UCH">全部范围</option>
           </select>
-          <select id="filterType" onchange="loadQuestions()">
-            <option value="">全部题型</option>
-            <option value="Single">单选</option>
-            <option value="Multiple">多选</option>
-            <option value="Judge">判断</option>
+          <select id="filterType" onchange="loadQuestions()" data-page-node-id="p0y2REMhByHQU2QrWVnEAD">
+            <option value="" data-page-node-id="FyxzoeG8d7tMtkYoB2lIaI">全部题型</option>
+            <option value="Single" data-page-node-id="EYm79aur5V12yjmM2bnxZn">单选</option>
+            <option value="Multiple" data-page-node-id="e9xOLUIAK26SJBtziLmesa">多选</option>
+            <option value="Judge" data-page-node-id="ojjTklXTAgcxk9RpcC852r">判断</option>
           </select>
         </div>
-        <div class="btn-group" style="margin-top:10px;">
-          <button class="btn btn-primary btn-sm" onclick="openQuestionModal()">➕ 新建题目</button>
-          <label class="btn btn-success btn-sm" style="cursor:pointer;">
+        <div class="btn-group" style="margin-top:10px;" data-page-node-id="JfyPvZPW03BRJWA3mhadn3">
+          <button class="btn btn-primary btn-sm" onclick="openQuestionModal()" data-page-node-id="mgnaLBhPGgMUx8sUVPyX5p">➕ 新建题目</button>
+          <label class="btn btn-success btn-sm" style="cursor:pointer;" data-page-node-id="yAaPnVMz0e3e4riTemH0lS">
             📥 批量导入(Excel/CSV)
-            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCsv(this)">
+            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCsv(this)" data-page-node-id="lSk3l1lDzVcV8fX1wBpzJQ">
           </label>
-          <button class="btn btn-outline btn-sm" onclick="downloadXlsxTemplate()">📊 下载Excel模板</button>
-          <button class="btn btn-outline btn-sm" onclick="downloadCsvTemplate()">📄 下载CSV模板</button>
-          <button class="btn btn-outline btn-sm" onclick="loadQuestions()">🔄 刷新</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadXlsxTemplate()" data-page-node-id="mfAaXZUOnNEuuAf0WxORCc">📊 下载Excel模板</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadCsvTemplate()" data-page-node-id="5YorIA61W4mBuxH9wikGt8">📄 下载CSV模板</button>
+          <button class="btn btn-outline btn-sm" onclick="loadQuestions()" data-page-node-id="JUzInyYqlAzqAQBx9w6wgf">🔄 刷新</button>
         </div>
       </div>
 
       <!-- 题目表格 -->
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>知识范围</th><th>题型</th><th>题目</th><th>答案</th><th>操作</th></tr></thead>
-          <tbody id="questionTableBody"><tr><td colspan="6" class="empty-state">加载中...</td></tr></tbody>
+      <div class="table-wrap" data-page-node-id="4vRdCSblsfPOStg4C3M10s">
+        <table data-page-node-id="JT2b3tXsliCHgAHZxFOf4N">
+          <thead data-page-node-id="4oeF76tnBxOqkj3Lc2Hr3C"><tr data-page-node-id="XrE7OH76KmnR5fdYBjbbUA"><th data-page-node-id="bJI26y6hdn8ETB5EQR7sYF">ID</th><th data-page-node-id="DO76pfj0TW83jPhRkyQzoD">知识范围</th><th data-page-node-id="CH1XzPnKfUeC67LV7RqG2d">题型</th><th data-page-node-id="oiKBflA3X8zUXp5W09FWLy">题目</th><th data-page-node-id="70qrBo1dkCpdYFMKMNJ29q">答案</th><th data-page-node-id="RVgBcFKWsr8hpmVOrMxxYz">操作</th></tr></thead>
+          <tbody id="questionTableBody" data-page-node-id="NAXn11eFXms5M9rZ3uzlHD"><tr data-page-node-id="mvCwT9tvLjUYDxC20jfbMw"><td colspan="6" class="empty-state" data-page-node-id="YjJu5PPvA0yV0N7HpkdZE3">加载中...</td></tr></tbody>
         </table>
       </div>
-      <div id="questionPagination" style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;"></div>
+      <div id="questionPagination" style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;" data-page-node-id="JbYH0gase1PS3FodqaGJnT"></div>
     </div>
 
     <!-- ===== Tab2：发布考试 ===== -->
-    <div id="tabPublish" style="display:none;">
-      <div class="card">
-        <h3 style="margin-bottom:14px;">📋 发布新考试</h3>
-        <div class="form-row" style="margin-bottom:14px;">
-          <label>考试标题 <span style="color:red">*</span></label>
-          <input type="text" id="examTitle" placeholder="例：2026年第一季度安全考试" style="width:100%;">
+    <div id="tabPublish" style="display:none;" data-page-node-id="GwvMJqweqAqGC99yl6V9fw">
+      <div class="card" data-page-node-id="4fkmdLZkD1ilFeNdJ2D1uc">
+        <h3 style="margin-bottom:14px;" data-page-node-id="yZ87q3m3x5audUUQY2T5SP">📋 发布新考试</h3>
+        <div class="form-row" style="margin-bottom:14px;" data-page-node-id="bGr7TaeBVl8O9ThFsjvQ4d">
+          <label data-page-node-id="jWEBLPAkq7JRFV6KUgOcRm">考试标题 <span style="color:red" data-page-node-id="0QyMlvUDdczsz1lYVO9beO">*</span></label>
+          <input type="text" id="examTitle" placeholder="例：2026年第一季度安全考试" style="width:100%;" data-page-node-id="cUsGTGNz9jHOCt5fnHzBuY">
         </div>
-        <div class="form-row" style="margin-bottom:14px;">
-          <label>考试说明（可选）</label>
+        <div class="form-row" style="margin-bottom:14px;" data-page-node-id="8LzlJEQaaf7ChzizMKcD0k">
+          <label data-page-node-id="bT7O8DkXhn8CGIsPFvAmqq">考试说明（可选）</label>
           <textarea id="examDesc" placeholder="考试说明..." rows="2" style="width:100%;"></textarea>
         </div>
-        <div class="form-grid-2" style="margin-bottom:14px;">
-          <div>
-            <label>开始时间 <span style="color:red">*</span></label>
-            <input type="datetime-local" id="examStartTime" style="width:100%;" onchange="calcDuration()">
+        <div class="form-grid-2" style="margin-bottom:14px;" data-page-node-id="EnpdC1cUjzvDPjxejhycqy">
+          <div data-page-node-id="u94mCZEP9CjuFBd91KYAzm">
+            <label data-page-node-id="pfoQXlBUERe3s13wMG5GtS">开始时间 <span style="color:red" data-page-node-id="0Ew0NqZveGCTjepvq7wEVQ">*</span></label>
+            <input type="datetime-local" id="examStartTime" style="width:100%;" onchange="calcDuration()" data-page-node-id="g3pY9vGprMTTgUUTzvTHIp">
           </div>
-          <div>
-            <label>结束时间 <span style="color:red">*</span></label>
-            <input type="datetime-local" id="examEndTime" style="width:100%;" onchange="calcDuration()">
+          <div data-page-node-id="Zk4rw4hAUMMspeJ5ctapza">
+            <label data-page-node-id="aKSiomtDFniGBoo3fHdAev">结束时间 <span style="color:red" data-page-node-id="r1aQu6aSh6xEaVN25q3eqB">*</span></label>
+            <input type="datetime-local" id="examEndTime" style="width:100%;" onchange="calcDuration()" data-page-node-id="vk6udsOtUHGrALqejtpvpY">
           </div>
         </div>
-        <div style="margin-bottom:14px;font-size:13px;color:var(--text-secondary);">
-          考试时长（自动计算）：<strong id="examDurationShow" style="color:var(--text-primary);">—</strong>
+        <div style="margin-bottom:14px;font-size:13px;color:var(--text-secondary);" data-page-node-id="Q7PjMZInAwGhOTcRXxMkSz">
+          考试时长（自动计算）：<strong id="examDurationShow" style="color:var(--text-primary);" data-page-node-id="a8BDsebkFWUwLOi6GSapft">—</strong>
         </div>
 
-        <h4 style="margin:18px 0 10px;">📐 选题规则（知识范围 + 题型 → 自动随机抽题）</h4>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">每行设置一组「知识范围（可填多个）+ 题型 + 题数 + 分值」，系统将按此从题库随机抽题生成试卷。</p>
+        <h4 style="margin:18px 0 10px;" data-page-node-id="uqfXUHyDPpvXa1fCiFbKEi">📐 选题规则（知识范围 + 题型 → 自动随机抽题）</h4>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;" data-page-node-id="P61e04Utj7066U9B7QAzQz">每行设置一组「知识范围（可填多个）+ 题型 + 题数 + 分值」，系统将按此从题库随机抽题生成试卷。</p>
 
-        <div class="table-wrap">
-          <table class="matrix-table" id="matrixTable">
-            <thead><tr><th>知识范围1</th><th>知识范围2</th><th>知识范围3</th><th>题型</th><th>题目数</th><th>每题分值</th><th>操作</th></tr></thead>
-            <tbody id="matrixBody"></tbody>
+        <div class="table-wrap" data-page-node-id="Ju9pkBwApXQim7wuAdjqca">
+          <table class="matrix-table" id="matrixTable" data-page-node-id="tQUoQGgmkYgaqYa9xh1i1Q">
+            <thead data-page-node-id="EkWf7Yc4ndP7vCWDeIVhN3"><tr data-page-node-id="nm6AQzkJqUJn3TCxpVzSnT"><th data-page-node-id="80e4f9VazoWtQYg8Wp4rWn">知识范围1</th><th data-page-node-id="niE6sz5ST4NqXh9ma1hiuR">知识范围2</th><th data-page-node-id="GLiZEri9qxzXQdSUucyLij">知识范围3</th><th data-page-node-id="bVIwE7TJIKt5VwtMNnjJCs">题型</th><th data-page-node-id="8yW2ZOUrEIMdZVOCWQ2H8T">题目数</th><th data-page-node-id="36zBUHXkAjkPXcwRplQCKz">每题分值</th><th data-page-node-id="vttQ0R8ce5R73tC8kE1gpx">操作</th></tr></thead>
+            <tbody id="matrixBody" data-page-node-id="s7JHRznLLVu7HV4Smr5hFV"></tbody>
           </table>
         </div>
-        <div style="margin-top:10px;">
-          <button class="btn btn-outline btn-sm" onclick="addMatrixRow()">➕ 添加一行规则</button>
+        <div style="margin-top:10px;" data-page-node-id="pHouhrZFblJqSTlzCyjmFk">
+          <button class="btn btn-outline btn-sm" onclick="addMatrixRow()" data-page-node-id="WLu2bJC4oamLvGDWZdAw4N">➕ 添加一行规则</button>
         </div>
 
-        <h4 style="margin:18px 0 10px;">👥 考试对象</h4>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">不导入名单则默认「全员可考」；导入名单后仅名单内考生可考。系统会自动创建账号：<strong>用户名 = 工号，登录密码 = 发布时自动生成的统一随机密码（所有人相同，发布成功后返回）</strong>。</p>
-        <div class="btn-group" style="margin-bottom:10px;">
-          <label class="btn btn-success btn-sm" style="cursor:pointer;">
+        <h4 style="margin:18px 0 10px;" data-page-node-id="EQJXVeOUWZ351LzymzInNV">👥 考试对象</h4>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;" data-page-node-id="Vel25Bk7HNLEhWFh9yKn2O">不导入名单则默认「全员可考」；导入名单后仅名单内考生可考。系统会自动创建账号：<strong data-page-node-id="wOrt1FhjbXFz5xT9IxMUJV">用户名 = 工号，登录密码 = 发布时自动生成的统一随机密码（所有人相同，发布成功后返回）</strong>。</p>
+        <div class="btn-group" style="margin-bottom:10px;" data-page-node-id="OY3zFeiSwGn9HdSXB1EdA8">
+          <label class="btn btn-success btn-sm" style="cursor:pointer;" data-page-node-id="WMTELKKgRq8DBizYq12RsW">
             📥 导入考生名单(Excel/CSV)
-            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCandidates(this)">
+            <input type="file" accept=".xlsx,.csv" style="display:none;" onchange="importCandidates(this)" data-page-node-id="VnHOzznBxsuxvtCBycF5LU">
           </label>
-          <button class="btn btn-outline btn-sm" onclick="downloadCandidateTemplate()">📊 下载名单模板</button>
-          <button class="btn btn-outline btn-sm" onclick="clearCandidates()" id="btnClearCandidates" style="display:none;">🗑 清空名单</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadCandidateTemplate()" data-page-node-id="7ddbppHvbUNy6rbdSTIBzt">📊 下载名单模板</button>
+          <button class="btn btn-outline btn-sm" onclick="clearCandidates()" id="btnClearCandidates" style="display:none;" data-page-node-id="omDNYykOtVZ9hGAaOxWlnI">🗑 清空名单</button>
         </div>
-        <div id="candidatePanel"></div>
+        <div id="candidatePanel" data-page-node-id="uliEPuQJUwhc8h9ERS3xFD"></div>
 
-        <div style="margin-top:20px;text-align:right;">
-          <button class="btn btn-primary" onclick="publishExam()" id="btnPublish">🚀 发布考试</button>
+        <div style="margin-top:20px;text-align:right;" data-page-node-id="FLBbTSAksSHWTpfSBsTGu5">
+          <button class="btn btn-primary" onclick="publishExam()" id="btnPublish" data-page-node-id="bQllWEbA6uMy2fQvnYGFAW">🚀 发布考试</button>
         </div>
       </div>
     </div>
 
     <!-- ===== Tab3：考试管理 ===== -->
-    <div id="tabExams" style="display:none;">
-      <div class="card">
-        <h3 style="margin-bottom:8px;">📑 考试管理</h3>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-          在此对所有已发布的考试进行：<strong>查看入口 / 修改 / 关闭 / 重新发布 / 删除</strong>。
-          <span style="color:var(--danger);">已有考生作答的考试不允许修改或删除（仅可关闭），避免历史成绩错乱。</span>
+    <div id="tabExams" style="display:none;" data-page-node-id="X742d23f2Sa2mZdVFotHAm">
+      <div class="card" data-page-node-id="ak73xTfDzHm2MuKQ5TeuW6">
+        <h3 style="margin-bottom:8px;" data-page-node-id="rg9PbtOqifELfI8okC9FnG">📑 考试管理</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" data-page-node-id="FsPr8GRHllGPDfEdthz8sl">
+          在此对所有已发布的考试进行：<strong data-page-node-id="AmZjyq5HmFzhz48RCDrMRR">查看入口 / 修改 / 关闭 / 重新发布 / 删除</strong>。
+          <span style="color:var(--danger);" data-page-node-id="aQMtQrJpC0BG6T8h6AAVKC">已有考生作答的考试不允许修改或删除（仅可关闭），避免历史成绩错乱。</span>
         </p>
-        <div class="toolbar">
-          <input type="text" id="examSearch" placeholder="🔍 搜索考试标题..." oninput="debounceLoadExams()">
-          <select id="examStatusFilter" onchange="loadExams()">
-            <option value="">全部状态</option>
-            <option value="Published">进行中</option>
-            <option value="Closed">已关闭</option>
+        <div class="toolbar" data-page-node-id="m7pyhgYIJUoZ982eAQvk5H">
+          <input type="text" id="examSearch" placeholder="🔍 搜索考试标题..." oninput="debounceLoadExams()" data-page-node-id="jHIdEmUazhxFkjfsLDm4Zy">
+          <select id="examStatusFilter" onchange="loadExams()" data-page-node-id="ov44zC5O8fMQWCoUT4rMrh">
+            <option value="" data-page-node-id="BgO7dIFzkYD39A8PGe0pSD">全部状态</option>
+            <option value="Published" data-page-node-id="wJWDiSKNJPfPpxRrjYD4kT">进行中</option>
+            <option value="Closed" data-page-node-id="PCgw6RHk6ikIkcFrE5Ru19">已关闭</option>
           </select>
-          <select id="examTargetFilter" onchange="loadExams()">
-            <option value="">全部对象</option>
-            <option value="All">全员</option>
-            <option value="Specified">指定人员</option>
+          <select id="examTargetFilter" onchange="loadExams()" data-page-node-id="vJeKq7JFnXWHDVBUTxQJAZ">
+            <option value="" data-page-node-id="pqv4bSm19SlizwRKQrxonK">全部对象</option>
+            <option value="All" data-page-node-id="1z4qGtOwnr8ZDmffHolEJE">全员</option>
+            <option value="Specified" data-page-node-id="H8rmKDSU0mR9Vo2BXeFFeZ">指定人员</option>
           </select>
-          <button class="btn btn-outline btn-sm" onclick="loadExams()">🔄 刷新</button>
+          <button class="btn btn-outline btn-sm" onclick="loadExams()" data-page-node-id="KRaNFzmmE1NE3Zlp9I9ur3">🔄 刷新</button>
         </div>
       </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>标题</th>
-              <th>状态</th>
-              <th>对象</th>
-              <th>题数/总分</th>
-              <th>参与</th>
-              <th>有效期</th>
-              <th style="min-width:230px;">操作</th>
+      <div class="table-wrap" data-page-node-id="sOzMGYds2tmvfYP0qmqa91">
+        <table data-page-node-id="8t0MTEnQKMS9kXyTGR2hTW">
+          <thead data-page-node-id="cErjj6oOjKRPSiHQtnoYHi">
+            <tr data-page-node-id="oDoKkDvgxefJgUFbqDVtpY">
+              <th data-page-node-id="Flpd6asVYRBs8FPQ8ERJCF">ID</th>
+              <th data-page-node-id="OxmAWZZlGgMeEVDiCqvwpZ">标题</th>
+              <th data-page-node-id="1gBNZa6E7nYOym0aAWEZXj">状态</th>
+              <th data-page-node-id="FqPWHNNvZZmTXusgdybcaN">对象</th>
+              <th data-page-node-id="ARF4bINJJcRtdnVNKJYlHD">题数/总分</th>
+              <th data-page-node-id="5h715EDylSduG0N0HPtVIA">参与</th>
+              <th data-page-node-id="jOaEXJABrftw9Fi8i0szOH">有效期</th>
+              <th style="min-width:230px;" data-page-node-id="eL3w2QjpFSNDuEZXUC9OKi">操作</th>
             </tr>
           </thead>
-          <tbody id="examMgmtBody"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+          <tbody id="examMgmtBody" data-page-node-id="Js0vFFWymGXvj9j7M5gmc3"><tr data-page-node-id="Bw1aXC35FtgLnY67su4DUr"><td colspan="8" class="empty-state" data-page-node-id="7PQfcROwjrzYwdlEf7HNOW">加载中...</td></tr></tbody>
         </table>
       </div>
     </div>
 
     <!-- ===== Tab4：历史记录 ===== -->
-    <div id="tabHistory" style="display:none;">
-      <div class="card">
-        <h3 style="margin-bottom:14px;">📊 历史考试</h3>
-        <div id="historyList"></div>
+    <div id="tabHistory" style="display:none;" data-page-node-id="z6uJvIwFaOi1oBHpXrfnGu">
+      <div class="card" data-page-node-id="ikayszlGIxWC3Y9JHX6aSl">
+        <h3 style="margin-bottom:14px;" data-page-node-id="PlxYnJSde1WHCuPGdCyc9v">📊 历史考试</h3>
+        <div id="historyList" data-page-node-id="O7j8BxkZgZVEAFzoncB67m"></div>
       </div>
 
-      <div id="historyDetail" style="display:none;" class="card">
-        <h3 style="margin-bottom:14px;" id="detailTitle">考试成绩明细</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>排名</th><th>考生</th><th>得分</th><th>提交时间</th></tr></thead>
-            <tbody id="detailBody"></tbody>
+      <div id="historyDetail" style="display:none;" class="card" data-page-node-id="KMUu7n8gjzBVcI6eWEFofN">
+        <h3 style="margin-bottom:14px;" id="detailTitle" data-page-node-id="EEdGZj9t8w35uRrLJ3SMBJ">考试成绩明细</h3>
+        <div class="table-wrap" data-page-node-id="UynTd1hZUj640xrGknoAMS">
+          <table data-page-node-id="CIfGOxOPZJP5N6OrJRsblP">
+            <thead data-page-node-id="yE9EpJA4tsJ43xli6TF9WO"><tr data-page-node-id="9Wf45nMRbeINcXgku1RfKz"><th data-page-node-id="KCDTAnL1pU73uwjyLjRQBK">排名</th><th data-page-node-id="AFY1dvD4eHcPk21oln5Lha">考生</th><th data-page-node-id="PClxAg0Ej2F3MC9AosDnmf">得分</th><th data-page-node-id="209v6goKmxph1viyZ7oeMK">提交时间</th></tr></thead>
+            <tbody id="detailBody" data-page-node-id="lJLaDcmRiOjxqXWxoGmiDv"></tbody>
           </table>
         </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-success btn-sm" onclick="exportScores()">📥 导出CSV</button>
-          <button class="btn btn-outline btn-sm" onclick="document.getElementById('historyDetail').style.display='none'">← 返回列表</button>
+        <div style="margin-top:12px;display:flex;gap:8px;" data-page-node-id="pBHU5lCiw1yTh04g54JqwH">
+          <button class="btn btn-success btn-sm" onclick="exportScores()" data-page-node-id="IElpxhV5YAJcuaB9Fm529f">📥 导出CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('historyDetail').style.display='none'" data-page-node-id="CKbfluiRvkrtGFVPNmaPx4">← 返回列表</button>
         </div>
       </div>
     </div>
@@ -201,156 +201,156 @@
   </div>
 
   <!-- ===== 题目编辑模态框 ===== -->
-  <div class="modal-overlay" id="questionModal">
-    <div class="modal">
-      <h3 id="modalTitle">新建题目</h3>
-      <input type="hidden" id="qId">
-      <div class="form-row"><label>知识范围 1 <span style="color:red">*</span></label><input type="text" id="qScope1" placeholder="如：物理、数学、安全..."></div>
-      <div class="form-row"><label>知识范围 2（可选）</label><input type="text" id="qScope2" placeholder="留空则不设置"></div>
-      <div class="form-row"><label>知识范围 3（可选）</label><input type="text" id="qScope3" placeholder="留空则不设置"></div>
-      <div class="form-row">
-        <label>题型</label>
-        <select id="qType" onchange="toggleOptions(this.value)">
-          <option value="Single">单选题</option>
-          <option value="Multiple">多选题</option>
-          <option value="Judge">判断题</option>
+  <div class="modal-overlay" id="questionModal" data-page-node-id="3rjF58Ie9zxH6nvVqBVIgu">
+    <div class="modal" data-page-node-id="1xpHJsAkTAPFl2sh8BVjyF">
+      <h3 id="modalTitle" data-page-node-id="OwC0EDBWdpXAqTTFOsvNpZ">新建题目</h3>
+      <input type="hidden" id="qId" data-page-node-id="5hSISFbfbd6bYWlKgQJ7oU">
+      <div class="form-row" data-page-node-id="UrrnCav6MMoUOaHihpvvIM"><label data-page-node-id="XEON2YoykgUKBNqukk36WU">知识范围 1 <span style="color:red" data-page-node-id="mpsYN1YveCZrNstzQdbRRE">*</span></label><input type="text" id="qScope1" placeholder="如：物理、数学、安全..." data-page-node-id="KjZvo0EqhzSDKFISMO3CR9"></div>
+      <div class="form-row" data-page-node-id="FGgwhqVntdYbC8jpHYIFES"><label data-page-node-id="jmg8y6OaWeIeAfb69EiFiY">知识范围 2（可选）</label><input type="text" id="qScope2" placeholder="留空则不设置" data-page-node-id="brlmUjGCK1EKikc0W9N6ic"></div>
+      <div class="form-row" data-page-node-id="2kslsr2qll58c9UOYOU5PZ"><label data-page-node-id="0WVXCQSOtxEdcLy8oaGyOa">知识范围 3（可选）</label><input type="text" id="qScope3" placeholder="留空则不设置" data-page-node-id="34J9R3mnGZ5ig4l81gZZHI"></div>
+      <div class="form-row" data-page-node-id="PMNfukY3Av8of8YOUcyji9">
+        <label data-page-node-id="GFTFnNnhdP2JuhbYn7bBMi">题型</label>
+        <select id="qType" onchange="toggleOptions(this.value)" data-page-node-id="BZIYvKFS1rUxJA0FGcn96X">
+          <option value="Single" data-page-node-id="7Elyod999hsFJm5BO7AdZl">单选题</option>
+          <option value="Multiple" data-page-node-id="EGFoEnQpYpDfOHehQBroTd">多选题</option>
+          <option value="Judge" data-page-node-id="4atbTT1KAujAYZCrfuhPpf">判断题</option>
         </select>
       </div>
-      <div class="form-row"><label>题目内容 <span style="color:red">*</span></label><textarea id="qContent" rows="3" placeholder="输入题目..."></textarea></div>
-      <div id="optionsGroup">
-        <div class="form-row"><label>选项 A</label><input type="text" id="qOptA" placeholder="选项A内容"></div>
-        <div class="form-row"><label>选项 B</label><input type="text" id="qOptB" placeholder="选项B内容"></div>
-        <div class="form-row"><label>选项 C</label><input type="text" id="qOptC" placeholder="选项C内容"></div>
-        <div class="form-row"><label>选项 D</label><input type="text" id="qOptD" placeholder="选项D内容"></div>
+      <div class="form-row" data-page-node-id="Mi8NFBtGdPIVR1cCV4HBxn"><label data-page-node-id="qOAetMrwhmR7flO4XFN0oP">题目内容 <span style="color:red" data-page-node-id="uMpRC0qShubW43Lmn25kaE">*</span></label><textarea id="qContent" rows="3" placeholder="输入题目..."></textarea></div>
+      <div id="optionsGroup" data-page-node-id="gOifrAVATJcio9eBF2gWn9">
+        <div class="form-row" data-page-node-id="4UAWxU0q6AxgLpBLjRsj40"><label data-page-node-id="W0KzcDi1Hots85k3v6Ph70">选项 A</label><input type="text" id="qOptA" placeholder="选项A内容" data-page-node-id="JDpi2ELwVJyt8z6t1tODho"></div>
+        <div class="form-row" data-page-node-id="OwT6pktPp5pUOMH5IkLgGU"><label data-page-node-id="iH4BYfrBbxPM1GsXVLB7XD">选项 B</label><input type="text" id="qOptB" placeholder="选项B内容" data-page-node-id="VHLeW6zKq8GQQaPulY4OFz"></div>
+        <div class="form-row" data-page-node-id="weiNDIALyj9Kn5P7FfExdS"><label data-page-node-id="Vy51YZsYlv5kTBoXNGAfr0">选项 C</label><input type="text" id="qOptC" placeholder="选项C内容" data-page-node-id="PFWeGYHEXFymTPRXuxtTY0"></div>
+        <div class="form-row" data-page-node-id="vHnmVQ1aFgSs41COFBLgEr"><label data-page-node-id="Z8nOzw2zeky97BQmpEpG6H">选项 D</label><input type="text" id="qOptD" placeholder="选项D内容" data-page-node-id="HGqcjtjplIfgbueRyZ2dkE"></div>
       </div>
-      <div class="form-row"><label>标准答案 <span style="color:red">*</span></label><input type="text" id="qAnswer" placeholder="单选/判断填 A/B/C/D，多选填如 AB"></div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeQuestionModal()">取消</button>
-        <button class="btn btn-primary" onclick="saveQuestion()">保存</button>
+      <div class="form-row" data-page-node-id="z23JODCEjE5TMNzR1384qo"><label data-page-node-id="A6pvC97amuxK74RwHAyBjE">标准答案 <span style="color:red" data-page-node-id="JP8zGobmpSLxEXwsv9dUzY">*</span></label><input type="text" id="qAnswer" placeholder="单选/判断填 A/B/C/D，多选填如 AB" data-page-node-id="x7IbFB6eRyfVGHE68DBRpi"></div>
+      <div class="modal-footer" data-page-node-id="YSCYeB75NBkLxUy5fRWfST">
+        <button class="btn btn-outline" onclick="closeQuestionModal()" data-page-node-id="4r5TJX0X3wlbUJdHGxCQDG">取消</button>
+        <button class="btn btn-primary" onclick="saveQuestion()" data-page-node-id="m5ohp07bjpHnOEIFtaHIhr">保存</button>
       </div>
     </div>
   </div>
 
   <!-- ===== 用户管理模态框 ===== -->
-  <div class="modal-overlay" id="userMgmtModal">
-    <div class="modal" style="max-width:900px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h3 style="margin:0;">👥 用户管理</h3>
-        <button class="btn btn-primary btn-sm" onclick="openUserCreateForm()">➕ 新增用户</button>
+  <div class="modal-overlay" id="userMgmtModal" data-page-node-id="yD6V7vjiCoF3IkxBeep0Gz">
+    <div class="modal" style="max-width:900px;" data-page-node-id="r4k5dBDckUgbPWZMyUshG0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" data-page-node-id="92snfyHlxFwLLIHWMJOEH9">
+        <h3 style="margin:0;" data-page-node-id="FwZ441lg46GxxNPgYBo1Zf">👥 用户管理</h3>
+        <button class="btn btn-primary btn-sm" onclick="openUserCreateForm()" data-page-node-id="mi996Z96xiEa3Be9pAwmB7">➕ 新增用户</button>
       </div>
-      <div class="table-wrap" style="max-height:55vh;overflow-y:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>用户名</th>
-              <th>姓名</th>
-              <th>工号</th>
-              <th>部门</th>
-              <th>角色</th>
-              <th>创建时间</th>
-              <th>操作</th>
+      <div class="table-wrap" style="max-height:55vh;overflow-y:auto;" data-page-node-id="GiwRVBvDngJsA0JSjOGx1o">
+        <table data-page-node-id="FCK6HdIKNXr4Fcl2U91kih">
+          <thead data-page-node-id="oxDm1PGCqnm7IPhmfq8LaJ">
+            <tr data-page-node-id="1yhZzg2oKLGN1L7IGjBcxz">
+              <th data-page-node-id="CtSGfOBmqqMdSklvXK6dTR">ID</th>
+              <th data-page-node-id="PfYdentzEBWEN46RojsBds">用户名</th>
+              <th data-page-node-id="fFQ6xf3k6ow7V8yU73OINY">姓名</th>
+              <th data-page-node-id="XcDDwMETwyoN8pN345QQBj">工号</th>
+              <th data-page-node-id="tiD7ntZ052uUC05VIbBDqI">部门</th>
+              <th data-page-node-id="hlnpofsL8mAPfRek9lTm2n">角色</th>
+              <th data-page-node-id="exfELgeX9HhLyIjtxtOQ4R">创建时间</th>
+              <th data-page-node-id="oqFwefV8BIZdpsi54cFhzL">操作</th>
             </tr>
           </thead>
-          <tbody id="userMgmtBody"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+          <tbody id="userMgmtBody" data-page-node-id="sS1X4V5dbwNdRIKJfUS1wC"><tr data-page-node-id="VHqppfpTzjm5hjHmWXGILz"><td colspan="8" class="empty-state" data-page-node-id="6EGAyy5bEkEuPcYTLQFZFB">加载中...</td></tr></tbody>
         </table>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeUserMgmt()">关闭</button>
+      <div class="modal-footer" data-page-node-id="ccLwmKynndUQRiOgeyju28">
+        <button class="btn btn-outline" onclick="closeUserMgmt()" data-page-node-id="GkaS0PHGlwZsZq6bh6YGeN">关闭</button>
       </div>
     </div>
   </div>
 
   <!-- ===== 用户编辑模态框 ===== -->
-  <div class="modal-overlay" id="userEditModal">
-    <div class="modal" style="max-width:520px;">
-      <h3 id="userEditTitle">编辑用户</h3>
-      <input type="hidden" id="ueId">
-      <div class="form-row"><label>用户名 <span style="color:red">*</span></label><input type="text" id="ueUsername" placeholder="登录用户名"></div>
-      <div class="form-row"><label>密码 <span style="color:red" id="uePwdRequired">*</span></label><input type="text" id="uePassword" placeholder="登录密码"></div>
-      <div class="form-row"><label>姓名</label><input type="text" id="ueDisplayName" placeholder="显示名"></div>
-      <div class="form-row"><label>工号</label><input type="text" id="ueJobNo" placeholder="考生工号"></div>
-      <div class="form-row"><label>部门</label><input type="text" id="ueDepartment" placeholder="所在部门"></div>
-      <div class="form-row">
-        <label>角色</label>
-        <select id="ueRole">
-          <option value="Candidate">考生</option>
-          <option value="Admin">管理员</option>
+  <div class="modal-overlay" id="userEditModal" data-page-node-id="dSECmUGGo8szzrPuVN1wdN">
+    <div class="modal" style="max-width:520px;" data-page-node-id="22ovgQHGJ7jmFxcH7xapv4">
+      <h3 id="userEditTitle" data-page-node-id="pK8ovGo0HVL6N8id7yfaCQ">编辑用户</h3>
+      <input type="hidden" id="ueId" data-page-node-id="lARzFPaNBJMKfJRBs1MAFD">
+      <div class="form-row" data-page-node-id="1lynLxSLsNAsNq8WO3WnfD"><label data-page-node-id="ehGjckRtAFqQ6tbinLU3lT">用户名 <span style="color:red" data-page-node-id="Op5aG1ULMAsuboxemxmX6Q">*</span></label><input type="text" id="ueUsername" placeholder="登录用户名" data-page-node-id="mlEQIWcxLuf0fZgMwXjOa1"></div>
+      <div class="form-row" data-page-node-id="2yQUgt4CKJggbZfuDyChRZ"><label data-page-node-id="26E4DsQXPscz5iFLSIfDIQ">密码 <span style="color:red" id="uePwdRequired" data-page-node-id="8LEI0mO0FDs6QTFGqSkzgK">*</span></label><input type="text" id="uePassword" placeholder="登录密码" data-page-node-id="k8NFCVcuphLu6Wz4rgcNDK"></div>
+      <div class="form-row" data-page-node-id="66fFsTFi9AAeJXqcLHyOe7"><label data-page-node-id="3pJB2TpapfbVgv4eJ5j0i1">姓名</label><input type="text" id="ueDisplayName" placeholder="显示名" data-page-node-id="qEjxcKS43VVC1mioVjzTVQ"></div>
+      <div class="form-row" data-page-node-id="WWCCNTYP8jQjUrX4mQGd5a"><label data-page-node-id="ICt3AIWshRFI6dFlFpGBnA">工号</label><input type="text" id="ueJobNo" placeholder="考生工号" data-page-node-id="PTaORd54e9sRpE7HRq3Kst"></div>
+      <div class="form-row" data-page-node-id="DUcJK6wf5rMorjFBmUbRSg"><label data-page-node-id="RoU2ljDfSDKwZRLL9MUAYi">部门</label><input type="text" id="ueDepartment" placeholder="所在部门" data-page-node-id="b8tBgzpuXtLYYKsMkwlQRz"></div>
+      <div class="form-row" data-page-node-id="Tk4OkBSghTmaEcBrFMIoGq">
+        <label data-page-node-id="TX3suhnyPbaxQDA1zZSADC">角色</label>
+        <select id="ueRole" data-page-node-id="BB52O69KYRoflP5fsqskrc">
+          <option value="Candidate" data-page-node-id="QPyPyz4oFyzSoyFCMRS7FH">考生</option>
+          <option value="Admin" data-page-node-id="pplg3SqH5J7LmFksl5TBMT">管理员</option>
         </select>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeUserEdit()">取消</button>
-        <button class="btn btn-primary" onclick="saveUserEdit()">保存</button>
+      <div class="modal-footer" data-page-node-id="5fYmsweIWbbidlP6FoGiPu">
+        <button class="btn btn-outline" onclick="closeUserEdit()" data-page-node-id="YSdS6bNiFZwmBF78aucE1z">取消</button>
+        <button class="btn btn-primary" onclick="saveUserEdit()" data-page-node-id="EYqZcAc0AsEuUjJASxfD8D">保存</button>
       </div>
     </div>
   </div>
 
   <!-- ===== 修改考试模态框 ===== -->
-  <div class="modal-overlay" id="examEditModal">
-    <div class="modal" style="max-width:640px;">
-      <h3>✏️ 修改考试</h3>
-      <input type="hidden" id="eeId">
-      <div class="form-row"><label>考试标题 <span style="color:red">*</span></label><input type="text" id="eeTitle"></div>
-      <div class="form-grid-2" style="margin-bottom:14px;">
-        <div>
-          <label>开始时间 <span style="color:red">*</span></label>
-          <input type="datetime-local" id="eeStartTime" style="width:100%;">
+  <div class="modal-overlay" id="examEditModal" data-page-node-id="zvZrhOHTpOrAuOPcqoTWHr">
+    <div class="modal" style="max-width:640px;" data-page-node-id="FPG5qz9364kywqDc0zDD2m">
+      <h3 data-page-node-id="XyBNdefnEe7XymUXgs8hmx">✏️ 修改考试</h3>
+      <input type="hidden" id="eeId" data-page-node-id="yOTwMdzfcnI0YRrjlWCWCE">
+      <div class="form-row" data-page-node-id="WkT58gvxGupftwvbsdJN9P"><label data-page-node-id="We2EnBvRkpkuZjFigHP7mt">考试标题 <span style="color:red" data-page-node-id="vH1kgbMm0rjr4cDg7Q1N0t">*</span></label><input type="text" id="eeTitle" data-page-node-id="M44AUZf6w0BoMFEVqmqXkE"></div>
+      <div class="form-grid-2" style="margin-bottom:14px;" data-page-node-id="UioDCmjklMGDjII2eFiWvb">
+        <div data-page-node-id="k9VGhxWTkB9p3j6UcuAfgl">
+          <label data-page-node-id="vvIyDDsW6rEK4N8OueNtgE">开始时间 <span style="color:red" data-page-node-id="61dfxb8HH6GJCuCNpiq1Eo">*</span></label>
+          <input type="datetime-local" id="eeStartTime" style="width:100%;" data-page-node-id="rZy7fmejLHYitGyItEE73n">
         </div>
-        <div>
-          <label>结束时间 <span style="color:red">*</span></label>
-          <input type="datetime-local" id="eeEndTime" style="width:100%;">
+        <div data-page-node-id="WWpnEf9r6eN4Zc3JRjGVP4">
+          <label data-page-node-id="icyU9x2FyMl4OQr0WOwXLA">结束时间 <span style="color:red" data-page-node-id="12idQWxkSAIq8O80gcVe3n">*</span></label>
+          <input type="datetime-local" id="eeEndTime" style="width:100%;" data-page-node-id="pvqVshfcik481v7ojTYuX7">
         </div>
       </div>
-      <div class="form-row">
-        <label>考试对象</label>
-        <select id="eeTargetMode" onchange="toggleEditTargetUsers(this.value)">
-          <option value="All">全员可考</option>
-          <option value="Specified">指定人员</option>
+      <div class="form-row" data-page-node-id="CrpY47D58ZJ6IJmqvH5tTf">
+        <label data-page-node-id="tGTQn1Ivlh8oiDJNpTCNTt">考试对象</label>
+        <select id="eeTargetMode" onchange="toggleEditTargetUsers(this.value)" data-page-node-id="y4cxvlnAjBZwaUAus1Bd7R">
+          <option value="All" data-page-node-id="baBtFgDkoulH8BPEZEye28">全员可考</option>
+          <option value="Specified" data-page-node-id="KIFzjEQrsokws566nfZYNb">指定人员</option>
         </select>
       </div>
-      <div id="eeTargetUsersPanel" style="display:none;margin-bottom:14px;">
-        <label style="font-size:14px;font-weight:500;display:block;margin-bottom:6px;">选择考生（至少 1 名）</label>
-        <div id="eeTargetUsers" style="max-height:180px;overflow-y:auto;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);"></div>
+      <div id="eeTargetUsersPanel" style="display:none;margin-bottom:14px;" data-page-node-id="paElYnRd9nHlAe1P6eh0n3">
+        <label style="font-size:14px;font-weight:500;display:block;margin-bottom:6px;" data-page-node-id="XrNiHrQtkbwYFRS8edArNY">选择考生（至少 1 名）</label>
+        <div id="eeTargetUsers" style="max-height:180px;overflow-y:auto;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);" data-page-node-id="bEBWBCgvG6wuxyHb9Q9IKk"></div>
       </div>
-      <div style="background:#fff7e6;color:#fa8c16;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;">
+      <div style="background:#fff7e6;color:#fa8c16;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;" data-page-node-id="OhWgsHquhyUnmPC9tURGYB">
         ⚠ 若该考试已有考生作答，仅能修改标题；时间与对象被锁定（避免历史成绩错乱）。
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeExamEdit()">取消</button>
-        <button class="btn btn-primary" onclick="saveExamEdit()">保存</button>
+      <div class="modal-footer" data-page-node-id="V2rMIniva58YF3xUqh3gC0">
+        <button class="btn btn-outline" onclick="closeExamEdit()" data-page-node-id="iuVHRrLXx3eXpe4EMdCvu0">取消</button>
+        <button class="btn btn-primary" onclick="saveExamEdit()" data-page-node-id="DHYBthyvdHHuA9c1cvBkKp">保存</button>
       </div>
     </div>
   </div>
 
   <!-- ===== 查看考试入口模态框 ===== -->
-  <div class="modal-overlay" id="examEntranceModal">
-    <div class="modal" style="max-width:640px;">
-      <h3>🔗 考试入口</h3>
-      <div id="entranceBody"></div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeExamEntrance()">关闭</button>
+  <div class="modal-overlay" id="examEntranceModal" data-page-node-id="CDlFZWPmMkFFCftvfuKNTz">
+    <div class="modal" style="max-width:640px;" data-page-node-id="BHA3LXfJfDyE0qcnHksyR4">
+      <h3 data-page-node-id="AnLSjzHbY057uSAqFWnG30">🔗 考试入口</h3>
+      <div id="entranceBody" data-page-node-id="eQj0UuIKqcUvwtdiFnf5vH"></div>
+      <div class="modal-footer" data-page-node-id="t56JVTqQFF2DPSAHBzEjEC">
+        <button class="btn btn-outline" onclick="closeExamEntrance()" data-page-node-id="VMlQ66EeDs1XLs3iw98Q7Z">关闭</button>
       </div>
     </div>
   </div>
 
   <!-- ===== 修改我的密码模态框 ===== -->
-  <div class="modal-overlay" id="myPwdModal">
-    <div class="modal" style="max-width:420px;">
-      <h3>🔑 修改我的密码</h3>
-      <div class="form-row"><label>当前密码 <span style="color:red">*</span></label><input type="password" id="mpOld" autocomplete="current-password"></div>
-      <div class="form-row"><label>新密码 <span style="color:red">*</span></label><input type="password" id="mpNew" autocomplete="new-password"></div>
-      <div class="form-row"><label>确认新密码 <span style="color:red">*</span></label><input type="password" id="mpNew2" autocomplete="new-password"></div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeMyPwd()">取消</button>
-        <button class="btn btn-primary" onclick="saveMyPwd()">保存</button>
+  <div class="modal-overlay" id="myPwdModal" data-page-node-id="TkiiBbk0V4sMPITGaCBPDW">
+    <div class="modal" style="max-width:420px;" data-page-node-id="kySxa1DSvifnDuIsZJGl3J">
+      <h3 data-page-node-id="xfP3fX4RcDceWlsc4FbYM1">🔑 修改我的密码</h3>
+      <div class="form-row" data-page-node-id="bdOkEKXMf5dFQCFAshMZmx"><label data-page-node-id="mCuZqeWRc0omXb04SLQuD1">当前密码 <span style="color:red" data-page-node-id="8XrmkAkHIhzzRO1jeGXHkq">*</span></label><input type="password" id="mpOld" autocomplete="current-password" data-page-node-id="0XKrcdXOYDL8SABaj1UR5U"></div>
+      <div class="form-row" data-page-node-id="rL4Ce22szDAKSqDBLWgY9Y"><label data-page-node-id="EGQMh7ikIENHfearZTi5E0">新密码 <span style="color:red" data-page-node-id="yngku9bLUO1Pqs6ET56SN3">*</span></label><input type="password" id="mpNew" autocomplete="new-password" data-page-node-id="GcW7poJtEFYO1NBqqo4L1H"></div>
+      <div class="form-row" data-page-node-id="2bG6LV7CoLcTCnhutEvgGs"><label data-page-node-id="ZfZqFelRGcreCyXFwOjCAB">确认新密码 <span style="color:red" data-page-node-id="YlAdDRGfhTH7Fq3rrJlG2a">*</span></label><input type="password" id="mpNew2" autocomplete="new-password" data-page-node-id="TFRpKkZ4DuhdRtJg7EW758"></div>
+      <div class="modal-footer" data-page-node-id="SFmhHzea9EGnliunsatPjJ">
+        <button class="btn btn-outline" onclick="closeMyPwd()" data-page-node-id="UfM9B72Ybre3Qqbfz535lW">取消</button>
+        <button class="btn btn-primary" onclick="saveMyPwd()" data-page-node-id="d41IVcDrvSvJB4GDz0QI0m">保存</button>
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
-  <script src="admin.js"></script>
+<script src="app.js?v=2"></script>
+<script src="admin.js?v=2"></script>
 
   <!-- Scope datalist -->
-  <datalist id="scopeList"></datalist>
+  <datalist id="scopeList" data-page-node-id="JolJjjeHusnNYe2HvK5Xiq"></datalist>
 </body>
 </html>
