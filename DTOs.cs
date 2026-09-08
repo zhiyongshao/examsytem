@@ -254,6 +254,38 @@ public class HistoryExamDto
     public DateTime CreatedAt { get; set; }
 }
 
+// ===== 考试编辑 =====
+public class UpdateExamRequest
+{
+    [Required] public string Title { get; set; } = "";
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public TargetMode? TargetMode { get; set; }
+    public List<int>? TargetUserIds { get; set; }
+}
+
+// ===== 考试入口信息（管理员分享给考生）=====
+public class ExamEntranceDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string TargetMode { get; set; } = "";
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public string FrontendUrl { get; set; } = "/exam.html"; // 相对路径，由前端拼接 origin
+    public string? CandidatePassword { get; set; }          // Specified 时有值
+    public List<CandidateEntranceUser> TargetUsers { get; set; } = new();
+}
+
+public class CandidateEntranceUser
+{
+    public int Id { get; set; }
+    public string Username { get; set; } = "";   // 登录用户名（= 工号）
+    public string DisplayName { get; set; } = ""; // 姓名
+    public string? Department { get; set; }
+}
+
 public class ResultRow
 {
     public int Rank { get; set; }
