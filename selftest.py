@@ -74,20 +74,22 @@ check("CSV 批量导入成功数=3", st == 200 and imp.get("success") == 3, str(
 
 # 6. 发布考试（二维选题：数学/单选3、数学/判断2、语文/多选2）
 rules = [
-    {"Scope": "数学", "Type": "Single", "Count": 3, "ScorePerQuestion": 5},
-    {"Scope": "数学", "Type": "Judge", "Count": 2, "ScorePerQuestion": 5},
-    {"Scope": "语文", "Type": "Multiple", "Count": 2, "ScorePerQuestion": 10},
+    {"Scope1": "数学", "Type": "Single", "Count": 3, "ScorePerQuestion": 5},
+    {"Scope1": "数学", "Type": "Judge", "Count": 2, "ScorePerQuestion": 5},
+    {"Scope1": "语文", "Type": "Multiple", "Count": 2, "ScorePerQuestion": 10},
 ]
 st, body = req("POST", "/api/exams", {
     "Title": "期中模拟考", "DurationMinutes": 30,
-    "TargetMode": "All", "Rules": rules
+    "TargetMode": "All", "Rules": rules,
+    "StartTime": "2026-01-01T00:00:00", "EndTime": "2026-12-31T23:59:59"
 }, token=admin)
 check("发布考试(二维选题)", st == 200, f"status={st} body={body[:120]}")
 exam = j(body)
 exam_id = exam["id"]
 check("考试总分=45", exam["totalScore"] == 45, f"totalScore={exam['totalScore']}")
 check("考试总题数=7", exam["totalQuestions"] == 7, f"n={exam['totalQuestions']}")
-check("矩阵含数学行", "数学" in exam["scopes"])
+check("矩阵含数学行", any((c.get("scope1") or "") == "数学" for c in exam.get("rules", [])),
+      str([(c.get("scope1"), c.get("type"), c.get("count")) for c in exam.get("rules", [])]))
 
 # 7. 考生登录
 st, body = req("POST", "/api/auth/login", {"Username": "student1", "Password": "student1"})
@@ -147,6 +149,57 @@ check("成绩明细2行", st == 200 and len(rows) == 2)
 # 14. 导出 CSV
 st, body = req("GET", f"/api/history/exams/{exam_id}/export", token=admin)
 check("导出成绩CSV", st == 200 and "排名" in body and "student1" in body, f"len={len(body)}")
+
+# 14a. 考试管理：列表
+st, body = req("GET", "/api/exams", token=admin)
+exams = j(body)
+check("管理-列表考试含1条", st == 200 and len(exams) == 1 and exams[0]["id"] == exam_id,
+      f"len={len(exams)} ids={[e['id'] for e in exams]}")
+
+# 14b. 考试管理：详情
+st, body = req("GET", f"/api/exams/{exam_id}", token=admin)
+det = j(body)
+check("管理-详情标题/总分", st == 200 and det["title"] == "期中模拟考" and det["totalScore"] == 45,
+      f"title={det.get('title')} total={det.get('totalScore')}")
+
+# 14c. 考试管理：修改（已有作答，仅允许改标题；时间/对象变更会被忽略，不报错）
+st, body = req("PUT", f"/api/exams/{exam_id}", {
+    "Title": "期中模拟考-V2",
+    "StartTime": "2026-01-01T00:00:00Z",
+    "EndTime": "2026-12-31T23:59:00Z",
+    "TargetMode": "All",
+    "TargetUserIds": []
+}, token=admin)
+upd = j(body)
+check("管理-修改标题生效", st == 200 and upd.get("title") == "期中模拟考-V2",
+      f"status={st} title={upd.get('title')}")
+
+# 14d. 考试管理：查看入口（All 模式，无密码、无指定用户）
+st, body = req("GET", f"/api/exams/{exam_id}/entrance", token=admin)
+ent = j(body)
+check("管理-入口含前端路径", st == 200 and ent.get("frontendUrl") == "/exam.html" and ent.get("targetMode") == "All",
+      f"ent={ent}")
+
+# 14e. 考试管理：重新发布（克隆+重抽题）
+st, body = req("POST", f"/api/exams/{exam_id}/republish", token=admin)
+rep = j(body)
+new_exam_id = rep.get("id") if isinstance(rep, dict) else None
+check("管理-重新发布新ID且标题加副本", st == 200 and new_exam_id and new_exam_id != exam_id and "副本" in (rep.get("title") or ""),
+      f"status={st} new_id={new_exam_id} title={rep.get('title')}")
+check("管理-新考试总分仍为45", st == 200 and rep.get("totalScore") == 45,
+      f"totalScore={rep.get('totalScore')}")
+
+# 14f. 考试管理：删除（先删无作答的副本，应成功）
+if new_exam_id:
+    st, body = req("DELETE", f"/api/exams/{new_exam_id}", token=admin)
+    check("管理-删除无作答考试成功", st == 200, f"status={st}")
+    st, body = req("GET", f"/api/exams/{new_exam_id}", token=admin)
+    check("管理-删除后404", st == 404, f"status={st}")
+
+# 14g. 考试管理：删除（有作答的原考试，应被拒绝 400）
+st, body = req("DELETE", f"/api/exams/{exam_id}", token=admin)
+check("管理-有作答的考试不可删", st == 400 and "已有考生作答" in (body or ""),
+      f"status={st} body={body[:120]}")
 
 # 15. 关闭考试
 st, body = req("POST", f"/api/exams/{exam_id}/close", token=admin)
