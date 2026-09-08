@@ -17,7 +17,27 @@ public class RankingService : IRankingService
 
     public async Task<List<RankingItem>> ComputeAsync(int examId)
     {
-        var total = (await _db.Exams.FindAsync(examId))?.TotalScore ?? 0;
+        var exam = await _db.Exams.FindAsync(examId);
+        var total = exam?.TotalScore ?? 0;
+
+        // 考试结束后仍在作答的，自动按 0 分收卷并纳入排名
+        if (exam != null && exam.EndTime != null && DateTime.UtcNow >= exam.EndTime.Value)
+        {
+            var expired = await _db.ExamSessions
+                .Where(s => s.ExamId == examId && s.Status == SessionStatus.InProgress)
+                .ToListAsync();
+            if (expired.Count > 0)
+            {
+                foreach (var s in expired)
+                {
+                    s.Status = SessionStatus.Graded;
+                    s.SubmitTime = exam.EndTime.Value;
+                    s.Score = 0;
+                }
+                await _db.SaveChangesAsync();
+            }
+        }
+
         var sessions = await _db.ExamSessions
             .Where(s => s.ExamId == examId && s.Status == SessionStatus.Graded)
             .Include(s => s.Answers)

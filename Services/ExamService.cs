@@ -18,6 +18,10 @@ public interface IExamService
 
     // 随机卷：按会话（考生）独立抽题并落库，返回该考生的题集
     Task<List<ExamQuestion>> DrawSessionPaperAsync(int examId, int sessionId);
+
+    // 考试监控 / 自动收卷
+    Task AutoCloseExpiredAsync(int examId);
+    Task<ExamMonitorDto?> GetMonitorAsync(int examId);
 }
 
 public class ExamService : IExamService
@@ -477,5 +481,126 @@ public class ExamService : IExamService
         }
 
         return dto;
+    }
+
+    // ===== 自动收卷：考试结束后仍在作答（InProgress）的答卷，按 0 分置为已交卷并纳入排名 =====
+    public async Task AutoCloseExpiredAsync(int examId)
+    {
+        var exam = await _db.Exams.FindAsync(examId);
+        if (exam == null || exam.EndTime == null) return;
+        var now = DateTime.UtcNow;
+        if (now < exam.EndTime.Value) return; // 未结束不收卷
+
+        var expired = await _db.ExamSessions
+            .Where(s => s.ExamId == examId && s.Status == SessionStatus.InProgress)
+            .ToListAsync();
+        if (expired.Count == 0) return;
+        foreach (var s in expired)
+        {
+            s.Status = SessionStatus.Graded;
+            s.SubmitTime = exam.EndTime.Value;
+            s.Score = 0; // 未提交，按 0 分计入排名
+        }
+        await _db.SaveChangesAsync();
+    }
+
+    // ===== 考试实时监控数据：每个候选人的登录/作答状态、分数、排名与统计 =====
+    public async Task<ExamMonitorDto?> GetMonitorAsync(int examId)
+    {
+        var exam = await _db.Exams.FindAsync(examId);
+        if (exam == null) return null;
+
+        // 先自动收卷，确保结束后数据一致
+        await AutoCloseExpiredAsync(examId);
+
+        // 候选范围：指定人员取名单；全员取所有考生
+        List<int> candidateIds;
+        if (exam.TargetMode == TargetMode.Specified && !string.IsNullOrWhiteSpace(exam.TargetUserIds))
+        {
+            candidateIds = exam.TargetUserIds.Split(',')
+                .Where(x => int.TryParse(x, out _)).Select(int.Parse).ToList();
+        }
+        else
+        {
+            candidateIds = await _db.Users
+                .Where(u => u.Role == UserRole.Candidate)
+                .Select(u => u.Id).ToListAsync();
+        }
+
+        var users = await _db.Users.Where(u => candidateIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id);
+        var sessions = await _db.ExamSessions
+            .Where(s => s.ExamId == examId).ToListAsync();
+
+        var now = DateTime.UtcNow;
+
+        var candidates = new List<MonitorCandidateDto>();
+        foreach (var cid in candidateIds)
+        {
+            users.TryGetValue(cid, out var u);
+            var sess = sessions.Where(s => s.UserId == cid)
+                .OrderByDescending(s => s.Id).FirstOrDefault();
+
+            string status;
+            double score = 0;
+            if (sess != null && (sess.Status == SessionStatus.Submitted || sess.Status == SessionStatus.Graded))
+            {
+                status = "已交卷";
+                score = sess.Score;
+            }
+            else if (sess != null && sess.Status == SessionStatus.InProgress)
+            {
+                status = "考试中";
+            }
+            else if (u != null && u.LastLoginAt != null)
+            {
+                // 已登录（无论考试是否已开始）但尚无论断/未交卷：处于等待/未开始作答状态
+                status = "未开始";
+            }
+            else
+            {
+                status = "未登陆";
+            }
+
+            candidates.Add(new MonitorCandidateDto
+            {
+                UserId = cid,
+                Username = u?.Username ?? "",
+                DisplayName = u?.DisplayName ?? "",
+                JobNo = u?.JobNo,
+                Department = u?.Department,
+                Status = status,
+                Score = Math.Round(score, 2)
+            });
+        }
+
+        // 已交卷者自动排名（同分用时短者靠前）
+        var submitted = candidates.Where(c => c.Status == "已交卷").ToList();
+        submitted.Sort((a, b) =>
+        {
+            int cmp = b.Score.CompareTo(a.Score);
+            if (cmp != 0) return cmp;
+            return 0;
+        });
+        for (int i = 0; i < submitted.Count; i++) submitted[i].Rank = i + 1;
+
+        var isEnded = exam.EndTime != null && now >= exam.EndTime.Value;
+        return new ExamMonitorDto
+        {
+            ExamId = exam.Id,
+            Title = exam.Title,
+            Status = exam.Status.ToString(),
+            PaperMode = exam.PaperMode.ToString(),
+            StartTime = exam.StartTime,
+            EndTime = exam.EndTime,
+            DurationMinutes = exam.DurationMinutes,
+            TotalScore = exam.TotalScore,
+            IsEnded = isEnded,
+            TotalCandidates = candidates.Count,
+            LoggedInCount = candidates.Count(c => c.Status != "未登陆"),
+            InProgressCount = candidates.Count(c => c.Status == "考试中"),
+            SubmittedCount = candidates.Count(c => c.Status == "已交卷"),
+            Candidates = candidates
+        };
     }
 }

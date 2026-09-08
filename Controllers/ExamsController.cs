@@ -57,6 +57,14 @@ public class ExamsController : ControllerBase
         return d == null ? NotFound() : Ok(d);
     }
 
+    // 管理员：实时监控（监考看板）—— 候选人的登录/作答状态、分数与排名
+    [HttpGet("{id}/monitor")]
+    public async Task<IActionResult> Monitor(int id)
+    {
+        var d = await _svc.GetMonitorAsync(id);
+        return d == null ? NotFound() : Ok(d);
+    }
+
     // 管理员：修改考试
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateExamRequest req)
