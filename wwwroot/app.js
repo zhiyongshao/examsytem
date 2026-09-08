@@ -2,7 +2,8 @@
 // ExamSystem 前端 - 共享逻辑
 // ============================================
 
-const API = 'http://localhost:5000/api';
+// 同源取 API 基址：本机用 localhost，局域网用服务端内网 IP，自动适配
+const API = window.location.origin + '/api';
 
 // ---- 工具 ----
 const $ = s => document.querySelector(s);
@@ -80,7 +81,9 @@ function connectRanking(examId, onRankingUpdate) {
   // 使用 SignalR JS 客户端（从 CDN 加载或内联实现）
   // 这里用原生 WebSocket + 自定义协议连接 /hubs/ranking
   const token = getToken();
-  const url = `ws://localhost:5000/hubs/ranking?access_token=${encodeURIComponent(token)}`;
+  // 同源 WebSocket：跟随页面协议(http->ws / https->wss)与主机，避免写死 localhost
+  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = `${wsProto}//${window.location.host}/hubs/ranking?access_token=${encodeURIComponent(token)}`;
   
   // 简易 SignalR WebSocket 协议握手
   rankingConn = new WebSocket(url);
