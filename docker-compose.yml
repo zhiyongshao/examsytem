@@ -1,0 +1,25 @@
+# ExamSystem 部署编排
+# 用法：在含本文件的目录下执行  docker compose up -d --build
+services:
+  exam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: examsystem:latest
+    container_name: examsystem
+    restart: unless-stopped
+    ports:
+      # 若前面再加 Nginx 反代，可改为不对外暴露（删掉这行，由 Nginx 走容器网络 exam:5000）
+      - "5000:5000"
+    environment:
+      # SQLite 库文件落在持久卷 /data，容器重建不丢数据
+      - EXAM_DB=Data Source=/data/exam.db
+      - ASPNETCORE_ENVIRONMENT=Production
+      # 上线务必改成强随机值！覆盖 appsettings 里的 Dev 默认密钥
+      # 可用命令生成：openssl rand -base64 48
+      - Jwt__Secret=REPLACE_WITH_STRONG_RANDOM_SECRET
+    volumes:
+      - examdata:/data
+
+volumes:
+  examdata:
