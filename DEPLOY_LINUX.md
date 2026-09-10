@@ -205,12 +205,30 @@ docker buildx build --platform linux/amd64,linux/arm64 `
    - 登录绕开网页：用 `docker login -u <用户名>`，密码填 Access Token。
 
 2. **阿里云容器镜像服务 ACR（推荐，无需代理）**
-   - 控制台建命名空间 + 仓库（个人版免费）。
-   - 用「**云端构建**」：把源码（或 git 库）交给阿里云，由阿里云构建机拉 `mcr` 并产出镜像、
-     存入你的 ACR 仓库；你本机/服务器只 `docker pull registry.cn-hangzhou.aliyuncs.com/<ns>/examsystem:latest`
-     （全程在墙内，快）。
-   - 登录：`docker login registry.cn-hangzhou.aliyuncs.com`（用阿里云账号）。
-   - compose 里 `image:` 改成上述地址；私有仓库服务器也要先 `docker login`。
+   - 核心开关：**「海外机器构建」**。开启后构建在阿里云海外机房进行，能正常拉
+     `mcr.microsoft.com/dotnet/sdk:8.0` 与 `nuget.org`，构建完把镜像推回国内仓库。
+     你本机/服务器全程只跟阿里云打交道，不出境。
+   - **代码源**（二选一，需先把代码 push 上去）：
+     - GitHub（最省事，本机若连得上）：ACR 海外构建机克隆 GitHub 顺畅。
+     - 阿里云 Codeup / Gitee（本机连不上 GitHub 时用，国内可达）。
+   - **控制台步骤**：
+     1. 开通容器镜像服务 → 个人版（免费）→ 选地域（如华东1 杭州）。
+     2. 仓库管理 → 代码源 → 绑定 GitHub / Codeup / Gitee 账号。
+     3. 仓库管理 → 镜像仓库 → 创建：命名空间（如 `exam`）+ 仓库名 `examsystem`；
+        仓库类型选**公开**（服务器 pull 免登录；镜像不含密钥/数据，公开无害；要严就选私有）。
+     4. 进仓库 → 构建 → 添加规则：
+        - 类型 `Branch`，分支 `main`；构建上下文目录 `/`（Dockerfile 在根）；Dockerfile 文件名 `Dockerfile`；镜像版本 `latest`（可加 `v1.0.0`）。
+        - 构建设置：**勾选「海外机器构建」**（关键），可勾「代码变更自动构建」。
+     5. 立即构建 → 看日志，状态成功即出镜像。
+   - **拉取域名注意（2024-09 起新版个人版）**：控制台「概览」会给你的专属登录/拉取域名，
+     旧版形如 `registry.cn-hangzhou.cr.aliyuncs.com`，新版形如 `crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com`。
+     以控制台「访问凭证」页给出的命令为准。示例（旧版）：
+     ```bash
+     docker login --username=<阿里云账号全名> registry.cn-hangzhou.cr.aliyuncs.com
+     docker pull registry.cn-hangzhou.cr.aliyuncs.com/exam/examsystem:latest
+     ```
+     新版把上面域名换成 `crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com` 即可。
+   - compose 里 `image:` 改成上面 pull 地址；私有仓库服务器也要先 `docker login`。
 
 3. **直接在服务器 build（最简，可完全不用 Docker Hub）**
    - 把 `ExamSystem` 文件夹 scp 到 Linux 服务器，`docker compose up -d --build` 即可。

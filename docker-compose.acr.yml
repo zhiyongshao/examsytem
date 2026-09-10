@@ -1,0 +1,28 @@
+# 从阿里云 ACR 拉镜像运行（本机/服务器都不需要构建）
+# 用法：docker compose -f docker-compose.acr.yml up -d
+#
+# 改这两处占位符：
+#   <ACR_PULL_DOMAIN>  控制台「访问凭证」给出的域名
+#                      （旧版 registry.cn-hangzhou.cr.aliyuncs.com
+#                       或 新版 crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com）
+#   <ns>               你的命名空间（建仓库时填的，如 exam）
+# 例：registry.cn-hangzhou.cr.aliyuncs.com/exam/examsystem:latest
+
+services:
+  exam:
+    image: <ACR_PULL_DOMAIN>/<ns>/examsystem:latest
+    container_name: examsystem
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # SQLite 落在持久卷 /data，容器重建不丢数据
+      - EXAM_DB=Data Source=/data/exam.db
+      - ASPNETCORE_ENVIRONMENT=Production
+      # ⚠️ 上线必须改成强随机值：openssl rand -base64 48
+      - Jwt__Secret=REPLACE_WITH_STRONG_RANDOM_SECRET
+    volumes:
+      - examdata:/data
+
+volumes:
+  examdata:
