@@ -21,3 +21,7 @@ publish*/
 .vscode/
 *.user
 *.suo
+
+# ===== Python / 临时 =====
+__pycache__/
+build

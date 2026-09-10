@@ -110,6 +110,8 @@ public class Exam
     public string? TargetUserIds { get; set; } // 指定人员：逗号分隔的 UserId
     public string? CandidatePassword { get; set; } // 指定人员发布时生成的统一随机登录密码
     public ExamPaperMode PaperMode { get; set; } = ExamPaperMode.Fixed; // 卷型：固定卷 / 按考生随机
+    public string? AccessSlug { get; set; } // 独立入口随机短链（/e/{slug}），每场唯一、不可枚举
+    public bool IsTraining { get; set; } = false; // 训练考试：不受登录/作答时间窗限制，Start 永远开新卷，可反复刷
     public List<ExamRule> Rules { get; set; } = new();
     public List<ExamQuestion> Questions { get; set; } = new();
 }

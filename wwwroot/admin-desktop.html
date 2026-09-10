@@ -3,13 +3,13 @@
 <head data-page-node-id="pFAeBev57x53VNUhYfpmSj">
   <meta charset="UTF-8" data-page-node-id="b9vbCpi4DbnCfM3K6TAzM4">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" data-page-node-id="XDFAjOOuMBD9h13YLN6H4W">
-  <title>在线考试系统 - 管理后台</title>
-  <link rel="stylesheet" href="style.css?v=2" data-page-node-id="qKlZZRAJLqiaXNlNC2buxD">
+  <title>纽威石油设备苏州有限公司考试管理系统 - 管理后台</title>
+  <link rel="stylesheet" href="style.css?v=7" data-page-node-id="qKlZZRAJLqiaXNlNC2buxD">
 </head>
 <body data-page-node-id="lbKtLeZZTujDVGfKHdH8gF">
   <!-- 导航栏 -->
   <nav class="navbar" id="navbar" data-page-node-id="6rPIDrpRaxIZcEEpdsT8bN">
-    <span class="title" data-page-node-id="MtrLFLViON2cH4Sa5mmdsb">🛠 管理后台</span>
+    <span class="title" data-page-node-id="MtrLFLViON2cH4Sa5mmdsb">🛠 纽威石油设备苏州有限公司考试管理系统</span>
     <div class="user-info" data-page-node-id="IdfUeq7cVwwJ5WaRENhepu">
       <button class="btn-logout" onclick="openUserMgmt()" title="用户管理" data-page-node-id="MEgAP3Gt98k1T1WgOqFgZO">👥 用户管理</button>
       <button class="btn-logout" onclick="openMyPassword()" title="修改我的密码" data-page-node-id="s7Aik3LAaDAiEmfeWjFSKP">🔑 我的密码</button>
@@ -46,10 +46,10 @@
       <div class="card" data-page-node-id="dbXjwx239SvG27wppaGFtv">
         <div class="toolbar" data-page-node-id="alAHRtl5jgsLUrK7EP8K5z">
           <input type="text" id="searchKey" placeholder="🔍 搜索题目内容..." oninput="debounceLoadQuestions()" data-page-node-id="E9BJZIMO8njeGYHAGd6IUu">
-          <select id="filterScope" onchange="loadQuestions()" data-page-node-id="oEtOZPVhzLV8bcXYHASo6b">
+          <select id="filterScope" onchange="loadQuestions(true)" data-page-node-id="oEtOZPVhzLV8bcXYHASo6b">
             <option value="" data-page-node-id="9XuZUWoGq7lX4qNrb21UCH">全部范围</option>
           </select>
-          <select id="filterType" onchange="loadQuestions()" data-page-node-id="p0y2REMhByHQU2QrWVnEAD">
+          <select id="filterType" onchange="loadQuestions(true)" data-page-node-id="p0y2REMhByHQU2QrWVnEAD">
             <option value="" data-page-node-id="FyxzoeG8d7tMtkYoB2lIaI">全部题型</option>
             <option value="Single" data-page-node-id="EYm79aur5V12yjmM2bnxZn">单选</option>
             <option value="Multiple" data-page-node-id="e9xOLUIAK26SJBtziLmesa">多选</option>
@@ -66,21 +66,26 @@
           <button class="btn btn-outline btn-sm" onclick="downloadCsvTemplate()" data-page-node-id="5YorIA61W4mBuxH9wikGt8">📄 下载CSV模板</button>
           <button class="btn btn-outline btn-sm" onclick="loadQuestions()" data-page-node-id="JUzInyYqlAzqAQBx9w6wgf">🔄 刷新</button>
         </div>
+        <div class="btn-group" id="qBatchBar" style="margin-top:10px;display:none;">
+          <span class="batch-tip">已选 <b id="qSelectedCount">0</b> 题</span>
+          <button class="btn btn-danger btn-sm" onclick="batchDeleteQuestions()">🗑️ 批量删除</button>
+          <button class="btn btn-outline btn-sm" onclick="clearQSelection()">取消选择</button>
+        </div>
       </div>
 
       <!-- 题目表格 -->
       <div class="table-wrap" data-page-node-id="4vRdCSblsfPOStg4C3M10s">
         <table data-page-node-id="JT2b3tXsliCHgAHZxFOf4N">
-          <thead data-page-node-id="4oeF76tnBxOqkj3Lc2Hr3C"><tr data-page-node-id="XrE7OH76KmnR5fdYBjbbUA"><th data-page-node-id="bJI26y6hdn8ETB5EQR7sYF">ID</th><th data-page-node-id="DO76pfj0TW83jPhRkyQzoD">知识范围</th><th data-page-node-id="CH1XzPnKfUeC67LV7RqG2d">题型</th><th data-page-node-id="oiKBflA3X8zUXp5W09FWLy">题目</th><th data-page-node-id="70qrBo1dkCpdYFMKMNJ29q">答案</th><th data-page-node-id="RVgBcFKWsr8hpmVOrMxxYz">操作</th></tr></thead>
-          <tbody id="questionTableBody" data-page-node-id="NAXn11eFXms5M9rZ3uzlHD"><tr data-page-node-id="mvCwT9tvLjUYDxC20jfbMw"><td colspan="6" class="empty-state" data-page-node-id="YjJu5PPvA0yV0N7HpkdZE3">加载中...</td></tr></tbody>
+          <thead data-page-node-id="4oeF76tnBxOqkj3Lc2Hr3C"><tr data-page-node-id="XrE7OH76KmnR5fdYBjbbUA"><th class="col-check"><input type="checkbox" id="qSelectAll" title="全选本页" onchange="onQSelectAll(this)"></th><th data-page-node-id="bJI26y6hdn8ETB5EQR7sYF">ID</th><th data-page-node-id="DO76pfj0TW83jPhRkyQzoD">知识范围</th><th data-page-node-id="CH1XzPnKfUeC67LV7RqG2d">题型</th><th data-page-node-id="oiKBflA3X8zUXp5W09FWLy">题目</th><th data-page-node-id="70qrBo1dkCpdYFMKMNJ29q">答案</th><th data-page-node-id="RVgBcFKWsr8hpmVOrMxxYz">操作</th></tr></thead>
+          <tbody id="questionTableBody" data-page-node-id="NAXn11eFXms5M9rZ3uzlHD"><tr data-page-node-id="mvCwT9tvLjUYDxC20jfbMw"><td colspan="7" class="empty-state" data-page-node-id="YjJu5PPvA0yV0N7HpkdZE3">加载中...</td></tr></tbody>
         </table>
       </div>
-      <div id="questionPagination" style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;" data-page-node-id="JbYH0gase1PS3FodqaGJnT"></div>
+      <div id="questionPagination" class="q-pagination" data-page-node-id="JbYH0gase1PS3FodqaGJnT"></div>
     </div>
 
     <!-- ===== Tab2：发布考试 ===== -->
     <div id="tabPublish" style="display:none;" data-page-node-id="GwvMJqweqAqGC99yl6V9fw">
-      <div class="card" data-page-node-id="4fkmdLZkD1ilFeNdJ2D1uc">
+      <div class="card publish-card" data-page-node-id="4fkmdLZkD1ilFeNdJ2D1uc">
         <h3 style="margin-bottom:14px;" data-page-node-id="yZ87q3m3x5audUUQY2T5SP">📋 发布新考试</h3>
         <div class="form-row" style="margin-bottom:14px;" data-page-node-id="bGr7TaeBVl8O9ThFsjvQ4d">
           <label data-page-node-id="jWEBLPAkq7JRFV6KUgOcRm">考试标题 <span style="color:red" data-page-node-id="0QyMlvUDdczsz1lYVO9beO">*</span></label>
@@ -106,7 +111,7 @@
 
         <div class="form-row" style="margin-bottom:14px;">
           <label>试卷类型</label>
-          <select id="examPaperMode" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
+          <select id="examPaperMode">
             <option value="Fixed">固定卷（发布时抽好，所有考生题目一致）</option>
             <option value="PerCandidate">随机卷（每名考生独立随机抽题，互不相同）</option>
           </select>
@@ -210,6 +215,7 @@
 
     <!-- ===== Tab5：考试监控（监考看板）===== -->
     <div id="tabMonitor" style="display:none;" data-page-node-id="Lm4nB7vC2xK9pQ3wR6tY8u">
+      <div id="monitorFullscreenWrap" class="monitor-fullscreen-wrap">
       <div class="card" data-page-node-id="Np5qW8xR2cV4bY7zK1mT3e">
         <h3 style="margin-bottom:8px;" data-page-node-id="Bv6cX9nM3qL5wR8tY2uK4p">📡 考试实时监控</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;" data-page-node-id="Cx7dF2mN4qL6wR9tY3uK5p">
@@ -219,6 +225,7 @@
           <select id="monitorExamSelect" onchange="onMonitorExamChange()" data-page-node-id="Ea9fH4nP6qN8wR1tY5uL7p" style="min-width:260px;"></select>
           <span id="monitorSummary" data-page-node-id="Fb0gI5nQ7qO9wR2tY6uM8p" style="font-size:13px;color:var(--text-secondary);"></span>
           <span class="tag tag-live" id="monitorLiveTag" data-page-node-id="Gc1hJ6nR8qP0wR3tY7uN9p" style="display:none;background:#e6f7ff;color:#1890ff;">● 实时刷新中</span>
+          <button class="btn btn-outline btn-sm" id="btnMonitorFullscreen" onclick="toggleMonitorFullscreen()" style="margin-left:auto;" title="将整个监考面板全屏显示（按 Esc 退出）">⛶ 全屏</button>
         </div>
       </div>
       <div class="table-wrap" data-page-node-id="Hd2iK7nS9qQ1wR4tY8uO0p" style="margin-top:12px;">
@@ -234,6 +241,7 @@
           </tr></thead>
           <tbody id="monitorBody" data-page-node-id="So3tV8nD0qB2wR5tY9uZ1p"><tr data-page-node-id="Tp4uW9nE1qC3wR6tY0uA2p"><td colspan="7" class="empty-state" data-page-node-id="Uq5vX0nF2qD4wR7tY1uB3p">请选择一场考试</td></tr></tbody>
         </table>
+      </div>
       </div>
     </div>
       </main>
@@ -387,8 +395,9 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
-  <script src="admin.js?v=3"></script>
+  <script src="app.js?v=8"></script>
+  <script src="lib/qrcode.min.js?v=1"></script>
+  <script src="admin.js?v=10"></script>
 
   <!-- Scope datalist -->
   <datalist id="scopeList" data-page-node-id="JolJjjeHusnNYe2HvK5Xiq"></datalist>

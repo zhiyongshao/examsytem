@@ -23,6 +23,12 @@ function clearAuth() {
   localStorage.removeItem('user');
 }
 
+// 读取 URL 查询参数（如 ?e=slug）
+function getQueryParam(name) {
+  try { return new URLSearchParams(location.search).get(name); }
+  catch { return null; }
+}
+
 async function api(method, path, body) {
   const opts = {
     method,
@@ -32,8 +38,28 @@ async function api(method, path, body) {
   if (t) opts.headers['Authorization'] = `Bearer ${t}`;
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(`${API}${path}`, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.title || `HTTP ${res.status}`);
+  // 安全解析：先读文本，再尝试 JSON；空体/非 JSON 也不崩，把可读错误抛出
+  const raw = await res.text();
+  let data = null;
+  if (raw) {
+    try { data = JSON.parse(raw); }
+    catch { data = { message: raw.slice(0, 200) }; }
+  }
+  if (!res.ok) {
+    let msg = data && (data.message || data.title);
+    if (!msg) {
+      if (res.status === 401) msg = '登录已过期或未登录（401），请重新登录';
+      else if (res.status === 403) msg = '没有权限访问该接口（403）';
+      else if (res.status === 404) msg = '接口不存在（404）';
+      else if (res.status >= 500) msg = `服务器错误（HTTP ${res.status}），请稍后重试`;
+      else msg = `HTTP ${res.status}`;
+    }
+    // 401 直接清掉旧 token，避免后续请求一直带着坏 token 失败
+    if (res.status === 401) clearAuth();
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -69,8 +95,15 @@ async function doLogin(username, password) {
 
 function logout() {
   clearAuth();
-  if (rankingConn) { rankingConn.stop(); rankingConn = null; }
-  location.href = 'index.html';
+  if (rankingConn) {
+    try { rankingConn.close(); } catch (e) {}
+    rankingConn = null;
+  }
+  // 强制回登录页；保留入口 slug（若当前是通过考试链接进入），加时间戳避免缓存命中旧页面
+  const slug = getQueryParam('e');
+  location.href = 'index.html'
+    + (slug ? '?e=' + encodeURIComponent(slug) : '')
+    + (slug ? '&' : '?') + 'ts=' + Date.now();
 }
 
 // ---- SignalR 实时排名 ----

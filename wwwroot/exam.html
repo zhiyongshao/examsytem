@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>在线考试系统 - 考试</title>
-  <link rel="stylesheet" href="style.css">
+  <title>纽威石油设备苏州有限公司考试管理系统 - 考试</title>
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <!-- 导航栏 -->
   <nav class="navbar" id="navbar" style="display:none;">
-    <span class="title" id="navTitle">在线考试</span>
+    <span class="title" id="navTitle">纽威石油设备苏州有限公司考试管理系统</span>
     <div class="user-info">
       <span id="userName"></span>
       <button class="btn-logout" onclick="logout()">退出</button>
@@ -79,29 +79,54 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <!-- ===== 考卷回顾 Modal ===== -->
+  <div class="modal-overlay" id="reviewOverlay">
+    <div class="modal review-modal">
+      <h3 id="reviewTitle">📄 考卷回顾</h3>
+      <div id="reviewBody" style="max-height:62vh;overflow:auto;margin-top:10px;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeReview()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=8"></script>
   <script>
     // ---- 状态 ----
     let currentExam = null;
     let currentSession = null;
+    let currentSessionId = null; // 当前答卷（会话）ID，提交与回看均以此为锚，确保共享账号下回看的是自己刚答的那份
     let questions = [];
     let timerInterval = null;
     let remainingSeconds = 0;
     let draftAnswers = {};
     let currentWaitId = null;     // 当前等待页对应的考试 ID
     let waitTimer = null;         // 等待页倒计时定时器
+    let currentEntrySlug = null;  // 通过独立入口（/e/xxx）进入时携带的 slug
     const PRE_WINDOW_MIN = 10;    // 考前允许登录/进入等待页的分钟数
 
     // ---- 初始化 ----
     (function init() {
       const user = getUser();
-      if (!user.role) { location.href = 'index.html'; return; }
+      currentEntrySlug = getQueryParam('e');
+      if (!user.role) {
+        location.href = 'index.html'
+          + (currentEntrySlug ? '?e=' + encodeURIComponent(currentEntrySlug) : '')
+          + (currentEntrySlug ? '&' : '?') + 'ts=' + Date.now();
+        return;
+      }
       if (user.role === 'Admin') { location.href = '/admin'; return; }
 
       $('#navbar').style.display = 'flex';
       $('#userName').textContent = user.displayName || user.username;
-      showPage('list');
-      loadExams();
+
+      if (currentEntrySlug) {
+        // 通过考试独立入口进入：跳过列表，直达该场倒计时页
+        enterBySlug(currentEntrySlug);
+      } else {
+        showPage('list');
+        loadExams();
+      }
     })();
 
     function showPage(page) {
@@ -162,11 +187,36 @@
       } catch(e) { toast('加载失败：' + e.message, 'error'); }
     }
 
+    // ---- 通过独立入口 slug 进入：取该场公开信息后直达倒计时页 ----
+    async function enterBySlug(slug) {
+      try {
+        const entry = await api('GET', '/exams/entry/' + encodeURIComponent(slug));
+        const ex = {
+          id: entry.examId,
+          title: entry.title,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          durationMinutes: entry.durationMinutes,
+          totalScore: entry.totalScore
+        };
+        showWait(ex);
+      } catch(e) {
+        toast('考试入口无效或已失效：' + e.message, 'error');
+        showPage('list');
+        loadExams();
+      }
+    }
+
     // ---- 考前等待页（倒计时）----
     function openWait(examId) {
       const ex = (examListCache || []).find(e => e.id === examId) || null;
       if (!ex) { toast('未找到考试信息', 'error'); return; }
-      currentWaitId = examId;
+      showWait(ex);
+    }
+
+    function showWait(ex) {
+      if (!ex) { toast('未找到考试信息', 'error'); return; }
+      currentWaitId = ex.id;
       $('#waitTitle').textContent = ex.title || '考试';
       const timeStr = ex.startTime ? new Date(ex.startTime).toLocaleString() : '-';
       const endStr = ex.endTime ? new Date(ex.endTime).toLocaleString() : '-';
@@ -205,6 +255,7 @@
         // 直接调用开始接口：后端会复用进行中的答卷，并返回题目 + 截止时间
         const resp = await api('POST', `/exams/${examId}/start`);
         currentSession = resp;
+        currentSessionId = resp.sessionId;
         currentExam = { id: examId };
         questions = resp.questions || [];
         draftAnswers = {};
@@ -236,7 +287,7 @@
         if (remainingSeconds <= 0) {
           clearInterval(timerInterval);
           toast('时间到！自动提交试卷', 'warn');
-          doSubmit();
+          doSubmit(null, false);
         }
       };
       update();
@@ -266,14 +317,24 @@
       if (confirm(msg)) doSubmit(answers);
     }
 
-    async function doSubmit(answers) {
+    async function doSubmit(answers, early = true) {
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       
       answers = answers || collectAnswers();
       const answeredCount = Object.values(answers).filter(v => v).length;
 
+      // 后端 SubmitRequest.Answers 是 List<SubmitAnswer>{questionId,selected}
+      // 前端 collectAnswers() 返回 dict {qidStr: selStr}，这里转成数组
+      const payload = {
+        sessionId: currentSessionId,
+        answers: Object.entries(answers)
+          .filter(([, v]) => v)                     // 跳过未作答（空串）
+          .map(([k, v]) => ({ questionId: Number(k), selected: v })),
+        early: early
+      };
+
       try {
-        const result = await api('POST', `/exams/${currentExam.id}/submit`, { answers: answers, early: true });
+        const result = await api('POST', `/exams/${currentExam.id}/submit`, payload);
         
         // 清除草稿
         localStorage.removeItem(`draft_${currentExam.id}`);
@@ -298,8 +359,9 @@
           <div class="result-row"><span>正确题数</span><span>${result.correctCount || '-'}</span></div>
           <div class="result-row"><span>提交时间</span><span>${new Date().toLocaleString()}</span></div>
         </div>
-        <div style="margin-top:20px;">
+        <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="loadRanking()">🏆 查看实时排名</button>
+          <button class="btn btn-outline" onclick="viewReview()">📄 查看考卷</button>
         </div>`;
       
       // 自动加载排名
@@ -317,13 +379,15 @@
       const panel = $('#rankingPanel');
       const list = $('#rankingList');
       panel.style.display = '';
-      
-      if (!data.rankings || !data.rankings.length) {
+
+      // 兼容两种返回结构：裸数组 或 { rankings: [...] }
+      const arr = Array.isArray(data) ? data : (data && data.rankings) || [];
+      if (!arr.length) {
         list.innerHTML = '<li class="empty-state"><p>暂无排名数据</p></li>';
         return;
       }
-      
-      list.innerHTML = data.rankings.map((r, i) => {
+
+      list.innerHTML = arr.map((r, i) => {
         const posClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-n';
         return `<li class="ranking-item">
           <span class="rank-pos ${posClass}">${i + 1}</span>
@@ -333,9 +397,73 @@
       }).join('');
     }
 
+    // ---- 查看考卷（提交/强制提交后）----
+    async function viewReview() {
+      try {
+        const qs = currentSessionId ? `?sessionId=${currentSessionId}` : '';
+        const data = await api('GET', `/exams/${currentExam.id}/review${qs}`);
+        renderReview(data);
+      } catch(e) {
+        toast('无法查看考卷：' + (e.message || ''), 'error');
+      }
+    }
+
+    function normalizeLetters(s) {
+      if (!s) return [];
+      return s.toUpperCase().split('').filter(c => c >= 'A' && c <= 'D').sort();
+    }
+
+    function renderReview(data) {
+      const body = $('#reviewBody');
+      $('#reviewTitle').textContent = '📄 考卷回顾 — ' + (data.title || '');
+      body.innerHTML = (data.questions || []).map((q, i) => {
+        const typeName = q.type === 'Single' ? '单选题' : q.type === 'Multiple' ? '多选题' : '判断题';
+        const sel = normalizeLetters(q.selected);
+        const cor = normalizeLetters(q.correctAnswer);
+        const optsHtml = Object.entries(q.options || {}).map(([k, v]) => {
+          const isSel = sel.includes(k);
+          const isCor = cor.includes(k);
+          let cls = 'review-opt';
+          let mark = '';
+          if (isCor && isSel) { cls += ' correct'; mark = '✔ 你的答案 · 正确'; }
+          else if (isCor && !isSel) { cls += ' missed'; mark = '（正确答案）'; }
+          else if (!isCor && isSel) { cls += ' wrong'; mark = '✘ 你的答案 · 错误'; }
+          return `<div class="${cls}">
+              <span class="opt-key">${k}</span>
+              <span class="opt-text">${escHtml(v)}</span>
+              <span class="opt-mark">${mark}</span>
+            </div>`;
+        }).join('');
+        const selText = q.selected ? q.selected : '未作答';
+        const footClass = q.isCorrect ? 'tag-correct' : 'tag-wrong';
+        const footText = q.isCorrect ? '✅ 正确' : '❌ 错误';
+        return `<div class="review-q ${q.isCorrect ? '' : 'wrong'}">
+            <div class="review-q-head">第 ${i + 1} 题</div>
+            <div class="review-q-meta">${typeName} · ${q.score} 分</div>
+            <div class="review-q-content">${escHtml(q.content)}</div>
+            ${optsHtml}
+            <div class="review-q-foot">
+              <span>你的答案：<b>${escHtml(selText)}</b></span>
+              <span>正确答案：<b>${escHtml(q.correctAnswer || '-')}</b></span>
+              <span class="${footClass}">${footText} · 得分 ${q.scoreGot}</span>
+            </div>
+          </div>`;
+      }).join('');
+      $('#reviewOverlay').classList.add('active');
+    }
+
+    function closeReview() {
+      $('#reviewOverlay').classList.remove('active');
+    }
+
     function backToList() {
       if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
-      if (rankingConn) { rankingConn.stop(); rankingConn = null; }
+      if (rankingConn) { try { rankingConn.close(); } catch (e) {} rankingConn = null; }
+      if (currentEntrySlug) {
+        // 通过独立入口进入：返回该场考试的倒计时页（重新加载入口）
+        location.href = 'exam.html?e=' + encodeURIComponent(currentEntrySlug);
+        return;
+      }
       showPage('list');
       loadExams();
     }

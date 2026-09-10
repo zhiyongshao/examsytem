@@ -2,6 +2,7 @@ using ExamSystem;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +56,8 @@ builder.Services.AddControllers()
     .AddJsonOptions(o => {
         o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // 所有 DateTime 统一以 UTC（带 Z）序列化，避免前端误判本地时区（+8h）
+        o.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -87,6 +90,13 @@ app.MapGet("/admin", async (HttpContext ctx, IWebHostEnvironment env) =>
     await ctx.Response.SendFileAsync(path);
 });
 
+// 考试独立入口短链：/e/{slug} → 302 跳转到考试页并带 slug 参数（每场考试 URL 不同）
+app.MapGet("/e/{slug}", (string slug, HttpContext ctx) =>
+{
+    ctx.Response.Redirect($"/exam.html?e={Uri.EscapeDataString(slug)}", false);
+    return Task.CompletedTask;
+});
+
 // API 未匹配时回退到 index.html（前端路由）
 app.MapFallbackToFile("index.html");
 
@@ -108,6 +118,9 @@ using (var scope = app.Services.CreateScope())
     EnsureColumn(db, "ExamQuestions", "SessionId", "INTEGER");
     EnsureColumn(db, "Users", "AccountType", "INTEGER NOT NULL DEFAULT 0");
     EnsureColumn(db, "Users", "LastLoginAt", "TEXT");
+    EnsureColumn(db, "Exams", "AccessSlug", "TEXT");
+    EnsureColumn(db, "Exams", "IsTraining", "INTEGER NOT NULL DEFAULT 0");
+    BackfillSlugs(db);
     Seed(db);
 }
 
@@ -149,9 +162,27 @@ static void EnsureColumn(AppDbContext db, string table, string column, string ty
     {
         if (!wasOpen) conn.Close();
     }
-}
 
-static void Seed(AppDbContext db)
+    }
+
+    /// <summary>为已存在但缺少 AccessSlug 的考试回填独立入口短链（新发布的考试在 Publish/Republish 时生成）。</summary>
+    static void BackfillSlugs(AppDbContext db)
+    {
+        var exams = db.Exams.Where(e => string.IsNullOrEmpty(e.AccessSlug)).ToList();
+        if (exams.Count == 0) return;
+        var used = db.Exams.Where(e => !string.IsNullOrEmpty(e.AccessSlug))
+            .Select(e => e.AccessSlug!).ToHashSet();
+        foreach (var e in exams)
+        {
+            string slug;
+            do { slug = PasswordHelper.Slug(); } while (used.Contains(slug));
+            used.Add(slug);
+            e.AccessSlug = slug;
+        }
+        db.SaveChanges();
+    }
+
+    static void Seed(AppDbContext db)
 {
     if (db.Users.Any()) return;
 

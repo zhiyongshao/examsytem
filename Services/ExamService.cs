@@ -12,9 +12,12 @@ public interface IExamService
 
     // 考试管理（新增）
     Task<ExamDetailDto?> UpdateAsync(int examId, UpdateExamRequest req);
-    Task<bool> DeleteAsync(int examId);
+    Task<ExamDeletePreviewDto?> GetDeletePreviewAsync(int examId);
+    Task<bool> DeleteAsync(int examId, bool cascadeSessions, bool cascadeUsers);
     Task<ExamDetailDto> RepublishAsync(int sourceExamId, int adminId);
     Task<ExamEntranceDto?> GetEntranceAsync(int examId);
+    // 考试独立入口：按 slug 取公开信息（匿名）
+    Task<ExamEntryPublicDto?> GetEntryBySlugAsync(string slug);
 
     // 随机卷：按会话（考生）独立抽题并落库，返回该考生的题集
     Task<List<ExamQuestion>> DrawSessionPaperAsync(int examId, int sessionId);
@@ -28,6 +31,17 @@ public class ExamService : IExamService
 {
     private readonly AppDbContext _db;
     public ExamService(AppDbContext db) => _db = db;
+
+    /// <summary>生成全局唯一的入口短链串（与现有考试不重复）。</summary>
+    private string GenerateUniqueSlug()
+    {
+        var used = _db.Exams
+            .Where(e => !string.IsNullOrEmpty(e.AccessSlug))
+            .Select(e => e.AccessSlug!).ToHashSet();
+        string slug;
+        do { slug = PasswordHelper.Slug(); } while (used.Contains(slug));
+        return slug;
+    }
 
     public async Task<ExamDetailDto> PublishAsync(PublishExamRequest req, int adminId)
     {
@@ -60,7 +74,9 @@ public class ExamService : IExamService
             TargetMode = req.TargetMode,
             TargetUserIds = req.TargetMode == TargetMode.Specified
                 ? string.Join(",", req.TargetUserIds) : null,
-            Status = ExamStatus.Published
+            Status = ExamStatus.Published,
+            AccessSlug = GenerateUniqueSlug(),   // 独立入口短链
+            IsTraining = req.IsTraining           // 训练考试：供考生反复刷题
         };
 
         // 指定人员发布：生成统一随机密码，应用到所有指定考生
@@ -171,6 +187,7 @@ public class ExamService : IExamService
             Status = exam.Status.ToString(),
             TargetMode = exam.TargetMode.ToString(),
             PaperMode = exam.PaperMode.ToString(),
+            IsTraining = exam.IsTraining,
             StartTime = exam.StartTime,
             EndTime = exam.EndTime,
             CandidatePassword = exam.CandidatePassword,
@@ -199,8 +216,8 @@ public class ExamService : IExamService
         foreach (var e in all.Where(e => e.Status == ExamStatus.Published))
         {
             if (submitted.Contains(e.Id)) continue;
-            // 已结束（过了结束时间）→ 不可见 / 无法进入
-            if (e.EndTime != null && now >= e.EndTime) continue;
+            // 训练考试始终可见（不受结束时间限制）；普通考试已结束则不可见
+            if (!e.IsTraining && e.EndTime != null && now >= e.EndTime) continue;
             if (e.TargetMode == TargetMode.Specified)
             {
                 var ids = (e.TargetUserIds ?? "").Split(',').Where(x => int.TryParse(x, out _)).Select(int.Parse).ToHashSet();
@@ -350,15 +367,105 @@ public class ExamService : IExamService
         return await DetailAsync(examId);
     }
 
-    // ===== 考试管理：删除（无考生作答时允许）=====
-    public async Task<bool> DeleteAsync(int examId)
+    // ===== 考试管理：删除前预览（关联数据清点）=====
+    public async Task<ExamDeletePreviewDto?> GetDeletePreviewAsync(int examId)
+    {
+        var exam = await _db.Exams.FindAsync(examId);
+        if (exam == null) return null;
+
+        var sessions = await _db.ExamSessions.Where(s => s.ExamId == examId).ToListAsync();
+        var submitted = sessions.Count(s => s.Status == SessionStatus.Submitted || s.Status == SessionStatus.Graded);
+        var inProgress = sessions.Count(s => s.Status == SessionStatus.InProgress);
+
+        var associated = await GetAssociatedCandidateIdsAsync(exam);
+        var exclusive = await GetExclusiveCandidateIdsAsync(exam, associated);
+
+        return new ExamDeletePreviewDto
+        {
+            ExamId = exam.Id,
+            Title = exam.Title,
+            HasSessions = sessions.Count > 0,
+            SessionCount = sessions.Count,
+            SubmittedCount = submitted,
+            InProgressCount = inProgress,
+            CandidateCount = associated.Count,
+            ExclusiveCandidateCount = exclusive.Count,
+            CanDeleteWithoutCascade = sessions.Count == 0
+        };
+    }
+
+    /// <summary>与本场关联的考生 ID：指定人员取名单，全员取所有候选人。</summary>
+    private async Task<List<int>> GetAssociatedCandidateIdsAsync(Exam exam)
+    {
+        List<int> ids;
+        if (exam.TargetMode == TargetMode.Specified && !string.IsNullOrWhiteSpace(exam.TargetUserIds))
+            ids = exam.TargetUserIds.Split(',').Where(x => int.TryParse(x, out _)).Select(int.Parse).ToList();
+        else
+            ids = await _db.Users.Where(u => u.Role == UserRole.Candidate).Select(u => u.Id).ToListAsync();
+        return ids;
+    }
+
+    /// <summary>仅被本场引用、且没有其他考试作答记录、也不被其他考试名单引用的考生（可安全级联删除）。</summary>
+    private async Task<List<int>> GetExclusiveCandidateIdsAsync(Exam exam, List<int> associated)
+    {
+        if (associated.Count == 0) return new();
+        var otherExamIds = await _db.Exams
+            .Where(e => e.Id != exam.Id && !string.IsNullOrWhiteSpace(e.TargetUserIds))
+            .Select(e => e.TargetUserIds!).ToListAsync();
+        var otherReferenced = new HashSet<int>();
+        foreach (var ids in otherExamIds)
+            foreach (var part in ids.Split(','))
+                if (int.TryParse(part, out var v)) otherReferenced.Add(v);
+
+        // 在其他考试有作答记录的考生，不删（避免误清其它考试历史成绩）
+        var withOtherSessions = (await _db.ExamSessions
+            .Where(s => s.ExamId != exam.Id && associated.Contains(s.UserId))
+            .Select(s => s.UserId).Distinct().ToListAsync()).ToHashSet();
+
+        return associated.Where(id => !otherReferenced.Contains(id) && !withOtherSessions.Contains(id)).ToList();
+    }
+
+    // ===== 考试管理：删除（支持级联清除作答记录 / 仅本场引用考生）=====
+    public async Task<bool> DeleteAsync(int examId, bool cascadeSessions, bool cascadeUsers)
     {
         var exam = await _db.Exams.FindAsync(examId);
         if (exam == null) return false;
 
-        var hasSessions = await _db.ExamSessions.AnyAsync(s => s.ExamId == examId);
-        if (hasSessions)
-            throw new InvalidOperationException("该考试已有考生作答，无法删除。\n如需让考生不可见，可使用「关闭」操作。");
+        var sessions = await _db.ExamSessions.Where(s => s.ExamId == examId).ToListAsync();
+        if (sessions.Count > 0 && !cascadeSessions && !cascadeUsers)
+            throw new InvalidOperationException(
+                $"该考试已有 {sessions.Count} 份作答记录（已交卷 {sessions.Count(s => s.Status == SessionStatus.Submitted || s.Status == SessionStatus.Graded)}、进行中 {sessions.Count(s => s.Status == SessionStatus.InProgress)}），无法删除。\n如需彻底删除，请在弹窗中勾选「一并删除作答记录」。");
+
+        // 收集需要删除的会话 ID。
+        // 考试即将被删除，其全部作答记录必须一并清理（无论勾选哪个级联项），
+        // 否则会因外键孤立/约束导致删除失败或残留脏数据。
+        List<int> sessionIdsToDelete = new();
+        if (sessions.Count > 0 && (cascadeSessions || cascadeUsers))
+        {
+            sessionIdsToDelete = sessions.Select(s => s.Id).ToList();
+        }
+
+        if (sessionIdsToDelete.Count > 0)
+        {
+            var answers = await _db.ExamAnswers.Where(a => sessionIdsToDelete.Contains(a.SessionId)).ToListAsync();
+            _db.ExamAnswers.RemoveRange(answers);
+            var toRemove = sessions.Where(s => sessionIdsToDelete.Contains(s.Id)).ToList();
+            _db.ExamSessions.RemoveRange(toRemove);
+        }
+
+        // 级联删除「仅被本场引用」的考生（安全限定：其他考试有记录的不删）
+        if (cascadeUsers)
+        {
+            var associated = await GetAssociatedCandidateIdsAsync(exam);
+            var exclusive = await GetExclusiveCandidateIdsAsync(exam, associated);
+            foreach (var uid in exclusive)
+            {
+                var u = await _db.Users.FindAsync(uid);
+                if (u == null) continue;
+                if (u.Role == UserRole.Admin) continue;  // 永不允许删管理员
+                _db.Users.Remove(u);
+            }
+        }
 
         var rules = await _db.ExamRules.Where(r => r.ExamId == examId).ToListAsync();
         var questions = await _db.ExamQuestions.Where(q => q.ExamId == examId).ToListAsync();
@@ -385,7 +492,8 @@ public class ExamService : IExamService
             TargetMode = source.TargetMode,
             TargetUserIds = source.TargetUserIds,
             PaperMode = source.PaperMode,
-            Status = ExamStatus.Published
+            Status = ExamStatus.Published,
+            AccessSlug = GenerateUniqueSlug()   // 重新发布 = 新考试，生成新入口短链
         };
 
         // 复制规则
@@ -454,6 +562,8 @@ public class ExamService : IExamService
         var exam = await _db.Exams.FindAsync(examId);
         if (exam == null) return null;
 
+        var slug = exam.AccessSlug ?? "";
+        var entryUrl = string.IsNullOrEmpty(slug) ? "/exam.html" : $"/e/{slug}";
         var dto = new ExamEntranceDto
         {
             Id = exam.Id,
@@ -462,7 +572,9 @@ public class ExamService : IExamService
             TargetMode = exam.TargetMode.ToString(),
             StartTime = exam.StartTime,
             EndTime = exam.EndTime,
-            FrontendUrl = "/exam.html",
+            FrontendUrl = entryUrl,
+            EntrySlug = slug,
+            EntryUrl = entryUrl,
             CandidatePassword = exam.CandidatePassword
         };
 
@@ -481,6 +593,28 @@ public class ExamService : IExamService
         }
 
         return dto;
+    }
+
+    // ===== 考试独立入口：按 slug 取公开信息（匿名）=====
+    public async Task<ExamEntryPublicDto?> GetEntryBySlugAsync(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug)) return null;
+        var exam = await _db.Exams.FirstOrDefaultAsync(e => e.AccessSlug == slug);
+        if (exam == null) return null;
+
+        return new ExamEntryPublicDto
+        {
+            ExamId = exam.Id,
+            Title = exam.Title,
+            Status = exam.Status.ToString(),
+            TargetMode = exam.TargetMode.ToString(),
+            StartTime = exam.StartTime,
+            EndTime = exam.EndTime,
+            DurationMinutes = exam.DurationMinutes,
+            TotalScore = exam.TotalScore,
+            HasPassword = exam.TargetMode == TargetMode.Specified && !string.IsNullOrEmpty(exam.CandidatePassword),
+            CandidatePassword = (exam.TargetMode == TargetMode.Specified) ? exam.CandidatePassword : null
+        };
     }
 
     // ===== 自动收卷：考试结束后仍在作答（InProgress）的答卷，按 0 分置为已交卷并纳入排名 =====

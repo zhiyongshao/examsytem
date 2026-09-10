@@ -94,9 +94,17 @@ public class UsersController : ControllerBase
             });
     }
 
-    // 删除用户
+    // 删除用户前预览关联数据（作答记录数、分布）
+    [HttpGet("{id}/delete-preview")]
+    public async Task<IActionResult> DeletePreview(int id)
+    {
+        var d = await _userSvc.GetDeletePreviewAsync(id);
+        return d == null ? NotFound(new { message = "用户不存在" }) : Ok(d);
+    }
+
+    // 删除用户（可级联清除其作答记录）
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, [FromBody] DeleteUserRequest? req)
     {
         if (id == CurrentUserId) return BadRequest(new { message = "不能删除自己" });
         var user = await _db.Users.FindAsync(id);
@@ -109,16 +117,20 @@ public class UsersController : ControllerBase
             if (adminCount <= 1) return BadRequest(new { message = "至少保留一位管理员" });
         }
 
-        // 阻止删除已经被考试引用的考生
-        var usedByExam = await _db.Exams.AnyAsync(e => e.TargetUserIds != null && e.TargetUserIds.Contains(id.ToString()));
-        if (usedByExam) return BadRequest(new { message = "该用户已被考试引用，不能删除" });
-
-        var hasSession = await _db.ExamSessions.AnyAsync(s => s.UserId == id);
-        if (hasSession) return BadRequest(new { message = "该用户已有考试记录，不能删除" });
-
-        _db.Users.Remove(user);
-        await _db.SaveChangesAsync();
-        return Ok(new { success = true });
+        var cascadeSessions = req?.CascadeSessions ?? false;
+        try
+        {
+            var ok = await _userSvc.DeleteAsync(id, cascadeSessions);
+            return ok ? Ok(new { success = true }) : NotFound(new { message = "用户不存在" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     // 管理员重置任意用户密码
@@ -143,8 +155,16 @@ public class UsersController : ControllerBase
         await using var stream = file.OpenReadStream();
         var isExcel = file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
                    || file.FileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
-        var result = await _userSvc.ImportCandidatesAsync(stream, isExcel);
-        return Ok(result);
+        try
+        {
+            var result = await _userSvc.ImportCandidatesAsync(stream, isExcel);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // 致命冲突：名单含 General 账号重名等，导入被整体拒绝
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     // 下载考生名单模板

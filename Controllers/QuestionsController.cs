@@ -47,6 +47,17 @@ public class QuestionsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
         => await _svc.DeleteAsync(id) ? Ok(new { success = true }) : NotFound();
 
+    public record BatchDeleteRequest(List<int> Ids);
+
+    [HttpPost("batch-delete")]
+    public async Task<IActionResult> BatchDelete([FromBody] BatchDeleteRequest req)
+    {
+        if (req?.Ids == null || req.Ids.Count == 0)
+            return BadRequest(new { message = "未选择任何题目" });
+        var removed = await _svc.DeleteManyAsync(req.Ids);
+        return Ok(new { success = true, removed });
+    }
+
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
     {

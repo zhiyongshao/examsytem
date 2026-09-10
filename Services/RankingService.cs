@@ -53,11 +53,21 @@ public class RankingService : IRankingService
             CorrectCount = s.Answers.Count(a => a.IsCorrect),
             TotalCount = s.Answers.Count,
             DurationSeconds = s.SubmitTime.HasValue ? (s.SubmitTime.Value - s.StartTime).TotalSeconds : 0,
-            Passed = total > 0 && s.Score >= total * 0.6
+            Passed = total > 0 && s.Score >= total * 0.6,
+            SubmitTime = s.SubmitTime,
+            LoginTime = users.GetValueOrDefault(s.UserId)?.LastLoginAt
         }).ToList();
 
-        // 同分按用时短者靠前
-        items = items.OrderByDescending(i => i.Score).ThenBy(i => i.DurationSeconds).ToList();
+        // 排名规则：
+        //   1) 高分优先（Score DESC）
+        //   2) 同分按提交时间优先（SubmitTime ASC，早提交者靠前）
+        //   3) 仍并列（真正同分且同时提交，或考试结束强制收卷的群体同分）：
+        //      登录时间晚者名次优先（LoginTime DESC）
+        items = items
+            .OrderByDescending(i => i.Score)
+            .ThenBy(i => i.SubmitTime)
+            .ThenByDescending(i => i.LoginTime)
+            .ToList();
         for (int i = 0; i < items.Count; i++) items[i].Rank = i + 1;
         return items;
     }

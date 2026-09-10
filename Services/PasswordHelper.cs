@@ -27,4 +27,12 @@ public static class PasswordHelper
         var rnd = System.Random.Shared;
         return new string(Enumerable.Repeat(alphabet, length).Select(a => a[rnd.Next(a.Length)]).ToArray());
     }
+
+    /// <summary>生成 URL 安全的随机短链串（去掉易混淆字符 0/O/1/I/l，大小写同义保留），默认 8 位，用于考试独立入口 /e/xxx。</summary>
+    public static string Slug(int length = 8)
+    {
+        const string alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+        var rnd = System.Random.Shared;
+        return new string(Enumerable.Repeat(alphabet, length).Select(a => a[rnd.Next(a.Length)]).ToArray());
+    }
 }

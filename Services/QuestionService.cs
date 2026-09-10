@@ -10,6 +10,7 @@ public interface IQuestionService
     Task<QuestionDto> CreateAsync(QuestionRequest req);
     Task<QuestionDto?> UpdateAsync(int id, QuestionRequest req);
     Task<bool> DeleteAsync(int id);
+    Task<int> DeleteManyAsync(IEnumerable<int> ids);
     Task<ImportResult> ImportCsvAsync(Stream csvStream);
     Task<ImportResult> ImportExcelAsync(Stream xlsxStream);
     byte[] BuildTemplateXlsx();
@@ -74,6 +75,15 @@ public class QuestionService : IQuestionService
         _db.Questions.Remove(q);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<int> DeleteManyAsync(IEnumerable<int> ids)
+    {
+        var list = await _db.Questions.Where(x => ids.Contains(x.Id)).ToListAsync();
+        if (list.Count == 0) return 0;
+        _db.Questions.RemoveRange(list);
+        await _db.SaveChangesAsync();
+        return list.Count;
     }
 
     public async Task<ImportResult> ImportCsvAsync(Stream csvStream)

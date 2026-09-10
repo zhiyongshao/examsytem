@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>在线考试系统 - 登录</title>
-  <link rel="stylesheet" href="style.css">
+  <title>纽威石油设备苏州有限公司考试管理系统 - 登录</title>
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <div class="login-page">
     <div class="login-card">
-      <h1>📝 在线考试系统</h1>
+      <h1>📝 纽威石油设备苏州有限公司考试管理系统</h1>
       <p class="subtitle">请登录以继续</p>
       <form id="loginForm" onsubmit="return false;">
         <div class="form-group">
@@ -30,12 +30,16 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=8"></script>
   <script>
+    // 读取考试独立入口短链（扫码/链接进入时携带）
+    const entrySlug = new URLSearchParams(location.search).get('e');
+
     // 已登录则跳转
     const user = getUser();
     if (user.role) {
-      location.href = user.role === 'Admin' ? '/admin' : 'exam.html';
+      location.href = user.role === 'Admin' ? '/admin'
+        : (entrySlug ? 'exam.html?e=' + encodeURIComponent(entrySlug) : 'exam.html');
     }
 
     // 密码框自动聚焦
@@ -43,15 +47,27 @@
     $('#username').addEventListener('keydown', e => { if (e.key === 'Enter') $('#password').focus(); });
     $('#btnLogin').addEventListener('click', doSubmit);
 
-    // 加载当前考试的统一登录密码提示
+    // 加载考试提示：若带入口 slug，则取该场考试的标题与统一登录密码；否则取最近一场指定人员考试
     (async function loadCandidateHint() {
       try {
-        const res = await fetch(API + '/auth/candidate-hint');
-        const data = await res.json();
-        if (data && data.password) {
+        let data = null;
+        if (entrySlug) {
+          const res = await fetch(API + '/exams/entry/' + encodeURIComponent(entrySlug));
+          if (res.ok) data = await res.json();
+        }
+        if (!data || !data.title) {
+          const res = await fetch(API + '/auth/candidate-hint');
+          data = await res.json();
+        }
+        if (data && data.title) {
           const el = document.getElementById('candidateHint');
           el.style.display = '';
-          el.textContent = '📢 本次考试' + (data.title ? '（' + data.title + '）' : '') + '：用户名 = 工号，密码 = ' + data.password;
+          if (entrySlug) {
+            el.textContent = '📢 正在进入：' + (data.title || '考试')
+              + (data.hasPassword ? '（用户名 = 工号，密码 = ' + (data.candidatePassword || '') + '）' : '');
+          } else if (data.password) {
+            el.textContent = '📢 本次考试' + (data.title ? '（' + data.title + '）' : '') + '：用户名 = 工号，密码 = ' + data.password;
+          }
         }
       } catch (e) {}
     })();
@@ -68,7 +84,8 @@
         const u = await doLogin(username, password);
         toast(`欢迎，${u.displayName || u.username}！`, 'success');
         setTimeout(() => {
-          location.href = u.role === 'Admin' ? '/admin' : 'exam.html';
+          location.href = u.role === 'Admin' ? '/admin'
+            : (entrySlug ? 'exam.html?e=' + encodeURIComponent(entrySlug) : 'exam.html');
         }, 600);
       } catch (e) {
         toast(e.message || '登录失败', 'error');

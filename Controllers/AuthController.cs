@@ -11,8 +11,9 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IJwtService _jwt;
-    // 考生（导入自动创建）账号的登录时间窗：考试开始前 N 分钟起、至考试结束止
+    // 考生（导入自动创建）账号的登录时间窗：考试开始前 N 分钟起、至考试结束后 M 小时止
     private const int LoginWindowMinutes = 10;
+    private const double LoginAfterEndHours = 1.0; // 考试结束后仍可登录的缓冲时长（用于考后回看考卷）
     public AuthController(AppDbContext db, IJwtService jwt) => (_db, _jwt) = (db, jwt);
 
     [HttpPost("login")]
@@ -33,7 +34,7 @@ public class AuthController : ControllerBase
             if (!inWindow)
                 return Unauthorized(new
                 {
-                    message = $"当前不在考试登录时间范围内（仅限被指定考试的「开始前 {LoginWindowMinutes} 分钟 ~ 考试结束」），无法登录。"
+                    message = $"当前不在考试登录时间范围内（仅限被指定考试的「开始前 {LoginWindowMinutes} 分钟 ~ 考试结束后 {LoginAfterEndHours} 小时」），无法登录。"
                 });
         }
 
@@ -62,7 +63,7 @@ public class AuthController : ControllerBase
         {
             if (e.StartTime == null || e.EndTime == null) return true;
             var openAt = e.StartTime.Value.AddMinutes(-LoginWindowMinutes);
-            if (now >= openAt && now <= e.EndTime.Value) return true;
+            if (now >= openAt && now <= e.EndTime.Value.AddHours(LoginAfterEndHours)) return true;
         }
         return false;
     }

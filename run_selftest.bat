@@ -1,4 +1,5 @@
-@echo off
+﻿@echo off
+chcp 65001 >nul
 rem ============================================================
 rem  ExamSystem 一键端到端自测（Windows 原生，无需 bash）
 rem  用法：双击本文件，或在 cmd 里执行 run_selftest.bat

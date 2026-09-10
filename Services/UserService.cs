@@ -7,6 +7,8 @@ public interface IUserService
 {
     Task<CandidateImportResult> ImportCandidatesAsync(Stream stream, bool isExcel);
     byte[] BuildCandidateTemplateXlsx();
+    Task<UserDeletePreviewDto?> GetDeletePreviewAsync(int userId);
+    Task<bool> DeleteAsync(int userId, bool cascadeSessions);
 }
 
 public class UserService : IUserService
@@ -19,6 +21,7 @@ public class UserService : IUserService
         var result = new CandidateImportResult();
         var seenUsernames = new HashSet<string>();
         var touched = new List<(User User, string Name)>();
+        var fatalErrors = new List<string>(); // 致命冲突：与现有 General 账号重名，整个导入拒绝
         var tempPwd = PasswordHelper.Random(8); // 占位密码，发布时会重置为统一随机密码
 
         void HandleRow(int lineNo, string name, string jobNo, string dept)
@@ -40,6 +43,13 @@ public class UserService : IUserService
             if (existing != null)
             {
                 if (existing.Role == UserRole.Admin) { result.Errors.Add($"第{lineNo}行：工号「{jobNo}」与管理员账号冲突，已跳过"); result.Failed++; return; }
+                // 不允许用 General（通用）账号作为考生重复导入：整个导入拒绝，不让任何数据落库
+                if (existing.AccountType == UserAccountType.General)
+                {
+                    if (!fatalErrors.Contains(jobNo)) fatalErrors.Add(jobNo);
+                    result.Failed++;
+                    return;
+                }
                 existing.DisplayName = displayName;
                 existing.JobNo = jobNo;
                 existing.Department = dept;
@@ -117,6 +127,14 @@ public class UserService : IUserService
             }
         }
 
+        // 致命冲突：名单含与现有 General（通用）账号重名的工号 → 整个导入拒绝，不落库
+        if (fatalErrors.Count > 0)
+        {
+            var bad = string.Join("、", fatalErrors.Distinct());
+            throw new InvalidOperationException(
+                $"导入被拒绝：名单中含有与现有 General（通用）账号重名的工号（{bad}）。通用账号不可作为考生导入，请移除这些工号后重试。");
+        }
+
         await _db.SaveChangesAsync();
         foreach (var (u, name) in touched)
             result.Items.Add(new CandidateBrief
@@ -129,6 +147,86 @@ public class UserService : IUserService
             });
 
         return result;
+    }
+
+    // ===== 删除前预览 + 级联删除（需求1）=====
+    public async Task<UserDeletePreviewDto?> GetDeletePreviewAsync(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return null;
+
+        var sessions = await _db.ExamSessions.Where(s => s.UserId == userId).ToListAsync();
+
+        // 注意：TargetUserIds 是逗号分隔的 ID 串，必须用精确拆分比较，不能用字符串 Contains（否则用户 2 会误命中 "12,23"）。
+        var referencedExamCount = (await _db.Exams
+                .Where(e => !string.IsNullOrWhiteSpace(e.TargetUserIds)).ToListAsync())
+            .Count(e => e.TargetUserIds!.Split(',').Any(x => int.TryParse(x, out var v) && v == userId));
+
+        var byExam = (await _db.Exams.ToListAsync())
+            .Where(e => sessions.Any(s => s.ExamId == e.Id))
+            .Select(e => new UserSessionByExamDto
+            {
+                ExamId = e.Id,
+                ExamTitle = e.Title,
+                Count = sessions.Count(s => s.ExamId == e.Id)
+            }).ToList();
+
+        return new UserDeletePreviewDto
+        {
+            UserId = user.Id,
+            Username = user.Username,
+            SessionCount = sessions.Count,
+            ReferencedExamCount = referencedExamCount,
+            ByExam = byExam,
+            CanDeleteWithoutCascade = sessions.Count == 0
+        };
+    }
+
+    public async Task<bool> DeleteAsync(int userId, bool cascadeSessions)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        // 不允许删除最后一位管理员
+        if (user.Role == UserRole.Admin)
+        {
+            var adminCount = await _db.Users.CountAsync(u => u.Role == UserRole.Admin);
+            if (adminCount <= 1) throw new InvalidOperationException("至少保留一位管理员");
+        }
+
+        var hasSession = await _db.ExamSessions.AnyAsync(s => s.UserId == userId);
+        // 精确判断：用户 ID 是否出现在某场考试的指定名单里（逗号分隔，避免 "2" 误命中 "12,23"）
+        var examsWithTargets = await _db.Exams
+            .Where(e => !string.IsNullOrWhiteSpace(e.TargetUserIds)).ToListAsync();
+        var referenced = examsWithTargets
+            .Any(e => e.TargetUserIds!.Split(',').Any(x => int.TryParse(x, out var v) && v == userId));
+        if ((hasSession || referenced) && !cascadeSessions)
+            throw new InvalidOperationException("该用户已被考试引用或已有作答记录，无法删除。\n如需彻底删除，请在弹窗中勾选「一并删除作答记录」。");
+
+        if (cascadeSessions && hasSession)
+        {
+            var sessionIds = await _db.ExamSessions.Where(s => s.UserId == userId).Select(s => s.Id).ToListAsync();
+            var answers = await _db.ExamAnswers.Where(a => sessionIds.Contains(a.SessionId)).ToListAsync();
+            _db.ExamAnswers.RemoveRange(answers);
+            var sessions = await _db.ExamSessions.Where(s => s.UserId == userId).ToListAsync();
+            _db.ExamSessions.RemoveRange(sessions);
+        }
+
+        // 从其它考试的指定名单中移除该用户，避免悬空引用
+        var examsWithUser = examsWithTargets;
+        foreach (var e in examsWithUser)
+        {
+            var ids = e.TargetUserIds!.Split(',').Where(x => int.TryParse(x, out _)).Select(int.Parse).ToList();
+            if (ids.Contains(userId))
+            {
+                ids.Remove(userId);
+                e.TargetUserIds = ids.Count > 0 ? string.Join(",", ids) : null;
+            }
+        }
+
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+        return true;
     }
 
     public byte[] BuildCandidateTemplateXlsx()

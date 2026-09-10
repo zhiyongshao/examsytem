@@ -57,6 +57,15 @@ public class ExamsController : ControllerBase
         return d == null ? NotFound() : Ok(d);
     }
 
+    // 匿名：按考试独立入口短链取公开信息（供登录页/倒计时页使用，不含题目）
+    [HttpGet("entry/{slug}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EntryBySlug(string slug)
+    {
+        var d = await _svc.GetEntryBySlugAsync(slug);
+        return d == null ? NotFound() : Ok(d);
+    }
+
     // 管理员：实时监控（监考看板）—— 候选人的登录/作答状态、分数与排名
     [HttpGet("{id}/monitor")]
     public async Task<IActionResult> Monitor(int id)
@@ -84,13 +93,23 @@ public class ExamsController : ControllerBase
         }
     }
 
-    // 管理员：删除考试
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    // 管理员：删除考试前预览关联数据（考生数、作答记录数）
+    [HttpGet("{id}/delete-preview")]
+    public async Task<IActionResult> DeletePreview(int id)
     {
+        var d = await _svc.GetDeletePreviewAsync(id);
+        return d == null ? NotFound(new { message = "考试不存在" }) : Ok(d);
+    }
+
+    // 管理员：删除考试（可级联清除作答记录 / 仅本场引用的考生）
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id, [FromBody] DeleteExamRequest? req)
+    {
+        var cascadeSessions = req?.CascadeSessions ?? false;
+        var cascadeUsers = req?.CascadeUsers ?? false;
         try
         {
-            return await _svc.DeleteAsync(id)
+            return await _svc.DeleteAsync(id, cascadeSessions, cascadeUsers)
                 ? Ok(new { success = true })
                 : NotFound(new { message = "考试不存在" });
         }

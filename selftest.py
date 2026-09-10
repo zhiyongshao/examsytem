@@ -177,7 +177,7 @@ check("管理-修改标题生效", st == 200 and upd.get("title") == "期中模�
 # 14d. 考试管理：查看入口（All 模式，无密码、无指定用户）
 st, body = req("GET", f"/api/exams/{exam_id}/entrance", token=admin)
 ent = j(body)
-check("管理-入口含前端路径", st == 200 and ent.get("frontendUrl") == "/exam.html" and ent.get("targetMode") == "All",
+check("管理-入口含前端路径", st == 200 and ent.get("targetMode") == "All" and (ent.get("frontendUrl") or "").startswith("/e/"),
       f"ent={ent}")
 
 # 14e. 考试管理：重新发布（克隆+重抽题）
@@ -198,7 +198,7 @@ if new_exam_id:
 
 # 14g. 考试管理：删除（有作答的原考试，应被拒绝 400）
 st, body = req("DELETE", f"/api/exams/{exam_id}", token=admin)
-check("管理-有作答的考试不可删", st == 400 and "已有考生作答" in (body or ""),
+check("管理-有作答的考试不可删", st == 400 and "作答记录" in (body or "") and "无法删除" in (body or ""),
       f"status={st} body={body[:120]}")
 
 # 15. 关闭考试

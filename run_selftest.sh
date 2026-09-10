@@ -18,13 +18,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/4] Building ExamSystem (Release)..."
-"$DOTNET" build -c Release --no-incremental 2>&1 | tail -4
+echo "[1/4] Restore + build ExamSystem (Release) via build_helper..."
+"$PY" build_helper.py
+if [ $? -ne 0 ]; then
+  echo "!! build failed"
+  exit 2
+fi
 
 rm -f "$DB" "$DB-wal" "$DB-shm"
 LOG=/tmp/exam_selftest.log
 echo "[2/4] Starting server with isolated DB..."
-EXAM_DB="Data Source=$(pwd -W)/selftest_run.db" "$DOTNET" run -c Release --no-build > "$LOG" 2>&1 &
+EXAM_DB="Data Source=$(pwd -W)/selftest_run.db" "$DOTNET" run -c Release --no-build --no-restore > "$LOG" 2>&1 &
 SRV_PID=$!
 
 ready=0

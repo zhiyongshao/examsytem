@@ -4,7 +4,7 @@ namespace ExamSystem;
 
 public interface IGradingService
 {
-    Task<ExamResultResponse> GradeAsync(int examId, int userId, List<SubmitAnswer> answers, bool early);
+    Task<ExamResultResponse> GradeAsync(int examId, int userId, int sessionId, List<SubmitAnswer> answers, bool early);
 }
 
 public class GradingService : IGradingService
@@ -12,16 +12,27 @@ public class GradingService : IGradingService
     private readonly AppDbContext _db;
     public GradingService(AppDbContext db) => _db = db;
 
-    public async Task<ExamResultResponse> GradeAsync(int examId, int userId, List<SubmitAnswer> answers, bool early)
+    public async Task<ExamResultResponse> GradeAsync(int examId, int userId, int sessionId, List<SubmitAnswer> answers, bool early)
     {
-        // 取进行中的答卷（没有则新建）
-        var session = await _db.ExamSessions
-            .Include(s => s.Answers)
-            .FirstOrDefaultAsync(s => s.ExamId == examId && s.UserId == userId && s.Status == SessionStatus.InProgress);
-        if (session == null)
+        // 取答卷：优先按 sessionId 精确取（共享账号/并发下保证判的是自己那份卷）；
+        // 未提供 sessionId 时回退到旧的"该用户进行中→任意"逻辑（向后兼容）
+        ExamSession? session;
+        if (sessionId > 0)
+        {
             session = await _db.ExamSessions
                 .Include(s => s.Answers)
-                .FirstOrDefaultAsync(s => s.ExamId == examId && s.UserId == userId);
+                .FirstOrDefaultAsync(s => s.Id == sessionId && s.ExamId == examId && s.UserId == userId);
+        }
+        else
+        {
+            session = await _db.ExamSessions
+                .Include(s => s.Answers)
+                .FirstOrDefaultAsync(s => s.ExamId == examId && s.UserId == userId && s.Status == SessionStatus.InProgress);
+            if (session == null)
+                session = await _db.ExamSessions
+                    .Include(s => s.Answers)
+                    .FirstOrDefaultAsync(s => s.ExamId == examId && s.UserId == userId);
+        }
 
         if (session == null)
             throw new InvalidOperationException("未找到考试答卷，请先开始考试");

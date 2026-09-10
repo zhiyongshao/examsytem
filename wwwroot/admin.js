@@ -3,7 +3,10 @@
     let allScopes = [];
     let importedCandidates = [];
     let qPage = 1;
-    const qPageSize = 15;
+    let qPageSize = 15;
+    let qTotal = 0;
+    let qTotalPages = 1;
+    let selectedQIds = new Set();
 
     // ==== 初始化 ====
     (function init() {
@@ -151,6 +154,36 @@
       document.getElementById('monitorBody').innerHTML = rows;
     }
 
+    // ---- 监考页面：全屏 ----
+    function toggleMonitorFullscreen() {
+      var el = document.getElementById('monitorFullscreenWrap');
+      if (!el) return;
+      var fsEl = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+      if (!fsEl) {
+        var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (req) {
+          try { req.call(el); } catch (e) { console.warn('[Monitor] requestFullscreen failed:', e); }
+        } else {
+          toast('当前浏览器不支持全屏 API', 'error');
+        }
+      } else {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exit) {
+          try { exit.call(document); } catch (e) { console.warn('[Monitor] exitFullscreen failed:', e); }
+        }
+      }
+    }
+
+    // Esc 或浏览器退出全屏时，按钮文字要同步
+    ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(function (ev) {
+      document.addEventListener(ev, function () {
+        var btn = document.getElementById('btnMonitorFullscreen');
+        if (!btn) return;
+        var fsEl = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+        btn.textContent = fsEl ? '⛶ 退出全屏' : '⛶ 全屏';
+      });
+    });
+
     // ==================== 题库管理 ====================
 
     async function loadScopes() {
@@ -177,9 +210,10 @@
     }
 
     var debounceTimer = null;
-    function debounceLoadQuestions() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadQuestions, 400); }
+    function debounceLoadQuestions() { clearTimeout(debounceTimer); debounceTimer = setTimeout(function() { loadQuestions(true); }, 400); }
 
-    async function loadQuestions() {
+    async function loadQuestions(resetPage) {
+      if (resetPage) qPage = 1;
       var tbody = document.getElementById('questionTableBody');
       try {
         var url = '/questions?page=' + qPage + '&pageSize=' + qPageSize;
@@ -196,21 +230,21 @@
         console.log('[Admin] Got', items.length, 'questions');
         renderQuestionTable(items);
 
-        var total = data.totalCount || items.length;
-        var pages = Math.ceil(total / qPageSize);
-        document.getElementById('questionPagination').textContent = total > qPageSize
-          ? '第 ' + qPage + '/' + pages + ' 页，共 ' + total + ' 题'
-          : '共 ' + total + ' 题';
+        // 后端返回字段名为 total；兼容旧字段名 totalCount
+        qTotal = (data.total != null ? data.total : (data.totalCount != null ? data.totalCount : items.length));
+        qTotalPages = Math.max(1, Math.ceil(qTotal / qPageSize));
+        renderQPager();
+        updateBatchBar();
       } catch(e) {
         console.error('[Admin] Load questions error:', e);
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state" style="color:var(--danger);">❌ 加载失败：' + escHtml(e.message) + '<br><br><button class="btn btn-outline btn-sm" onclick="loadQuestions()">重试</button></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--danger);">❌ 加载失败：' + escHtml(e.message) + '<br><br><button class="btn btn-outline btn-sm" onclick="loadQuestions()">重试</button></td></tr>';
       }
     }
 
     function renderQuestionTable(items) {
       var tbody = document.getElementById('questionTableBody');
       if (!items || !items.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">📭</div><p>暂无题目</p><p style="font-size:12px;margin-top:4px;">点击上方「新建题目」或「批量导入」添加</p></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">📭</div><p>暂无题目</p><p style="font-size:12px;margin-top:4px;">点击上方「新建题目」或「批量导入」添加</p></td></tr>';
         return;
       }
       var html = '';
@@ -219,7 +253,9 @@
         var scopes = [q.scope1, q.scope2, q.scope3].filter(Boolean);
         var scopeTags = scopes.map(function(s) { return '<span class="tag tag-scope">' + escHtml(s) + '</span>'; }).join('');
         var typeLabel = TYPE_LABELS[q.type] || q.type;
+        var checked = selectedQIds.has(q.id) ? ' checked' : '';
         html += '<tr>' +
+          '<td class="col-check"><input type="checkbox" class="q-check" data-qid="' + q.id + '"' + checked + ' onchange="onQRowCheck(this,' + q.id + ')"></td>' +
           '<td>' + q.id + '</td>' +
           '<td>' + scopeTags + '</td>' +
           '<td><span class="tag tag-type">' + typeLabel + '</span></td>' +
@@ -232,6 +268,100 @@
         '</tr>';
       }
       tbody.innerHTML = html;
+      // 渲染后同步全选框的半选/全选状态
+      syncQSelectAllState();
+    }
+
+    // ---- 多选 / 全选 / 批量删除 ----
+    function onQRowCheck(cb, id) {
+      if (cb.checked) selectedQIds.add(id); else selectedQIds.delete(id);
+      syncQSelectAllState();
+      updateBatchBar();
+    }
+
+    function onQSelectAll(cb) {
+      var boxes = document.querySelectorAll('#questionTableBody input.q-check');
+      for (var i = 0; i < boxes.length; i++) {
+        var b = boxes[i];
+        b.checked = cb.checked;
+        var id = parseInt(b.getAttribute('data-qid'), 10);
+        if (cb.checked) selectedQIds.add(id); else selectedQIds.delete(id);
+      }
+      updateBatchBar();
+    }
+
+    function syncQSelectAllState() {
+      var boxes = document.querySelectorAll('#questionTableBody input.q-check');
+      var sa = document.getElementById('qSelectAll');
+      if (!sa) return;
+      if (boxes.length === 0) { sa.checked = false; sa.indeterminate = false; return; }
+      var checkedCount = 0;
+      for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) checkedCount++;
+      sa.checked = checkedCount === boxes.length;
+      sa.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+    }
+
+    function updateBatchBar() {
+      var bar = document.getElementById('qBatchBar');
+      if (!bar) return;
+      var n = selectedQIds.size;
+      bar.style.display = n > 0 ? '' : 'none';
+      var cnt = document.getElementById('qSelectedCount');
+      if (cnt) cnt.textContent = n;
+    }
+
+    function clearQSelection() {
+      selectedQIds.clear();
+      var boxes = document.querySelectorAll('#questionTableBody input.q-check');
+      for (var i = 0; i < boxes.length; i++) boxes[i].checked = false;
+      var sa = document.getElementById('qSelectAll');
+      if (sa) { sa.checked = false; sa.indeterminate = false; }
+      updateBatchBar();
+    }
+
+    async function batchDeleteQuestions() {
+      if (selectedQIds.size === 0) { toast('请先勾选要删除的题目', 'warn'); return; }
+      var ids = Array.from(selectedQIds);
+      if (!confirm('确定批量删除选中的 ' + ids.length + ' 道题目吗？此操作不可撤销！')) return;
+      try {
+        var res = await api('POST', '/questions/batch-delete', { ids: ids });
+        var removed = (res && res.removed) || ids.length;
+        toast('已删除 ' + removed + ' 道题目', 'success');
+        selectedQIds.clear();
+        // 若当前页被删空且不是第一页，回退一页避免空白
+        if (qPage > 1 && qTotal - removed <= (qPage - 1) * qPageSize) qPage = qPage - 1;
+        loadScopes();
+        loadQuestions();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // ---- 分页 ----
+    function renderQPager() {
+      var p = document.getElementById('questionPagination');
+      if (!p) return;
+      var sizes = [10, 15, 20, 30, 50];
+      var sizeOpts = sizes.map(function(s) {
+        return '<option value="' + s + '"' + (s === qPageSize ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+      var html =
+        '<button class="btn btn-outline btn-sm" ' + (qPage <= 1 ? 'disabled' : '') + ' onclick="goQPage(' + (qPage - 1) + ')">‹ 上一页</button>' +
+        '<span class="q-page-info">第 ' + qPage + ' / ' + qTotalPages + ' 页，共 ' + qTotal + ' 题</span>' +
+        '<button class="btn btn-outline btn-sm" ' + (qPage >= qTotalPages ? 'disabled' : '') + ' onclick="goQPage(' + (qPage + 1) + ')">下一页 ›</button>' +
+        '<span class="q-page-size">每页 <select id="qPageSizeSel" onchange="changeQPageSize(this.value)">' + sizeOpts + '</select> 条</span>';
+      p.innerHTML = html;
+    }
+
+    function goQPage(pg) {
+      pg = Math.max(1, Math.min(qTotalPages, pg));
+      if (pg === qPage) return;
+      qPage = pg;
+      loadQuestions();
+    }
+
+    function changeQPageSize(v) {
+      qPageSize = parseInt(v, 10) || 15;
+      qPage = 1;
+      loadQuestions();
     }
 
     function openQuestionModal(id) {
@@ -318,6 +448,8 @@
       try {
         await api('DELETE', '/questions/' + id);
         toast('已删除', 'success');
+        selectedQIds.delete(id);
+        updateBatchBar();
         loadQuestions();
       } catch(e) { toast(e.message, 'error'); }
     }
@@ -389,8 +521,10 @@
           headers: { 'Authorization': 'Bearer ' + token },
           body: formData
         });
-        var data = await res.json();
-        if (!res.ok) throw new Error(data.message || '导入失败');
+        var _raw = await res.text();
+        var data = null;
+        try { data = _raw ? JSON.parse(_raw) : null; } catch { data = { message: _raw.slice(0,200) }; }
+        if (!res.ok) throw new Error((data && data.message) || (res.status === 401 ? '登录已过期或未登录，请重新登录' : '导入失败（HTTP ' + res.status + '）'));
         var msg = '导入完成：成功 ' + (data.success || 0) + ' 条';
         if (data.failed > 0) msg += '，失败 ' + data.failed + ' 条';
         toast(msg, data.failed > 0 ? 'warn' : 'success');
@@ -436,10 +570,13 @@
           headers: { 'Authorization': 'Bearer ' + token },
           body: formData
         });
-        var data = await res.json();
-        if (!res.ok) throw new Error(data.message || '导入失败');
+        var _raw = await res.text();
+        var data = null;
+        try { data = _raw ? JSON.parse(_raw) : null; } catch { data = { message: _raw.slice(0,200) }; }
+        if (!res.ok) throw new Error((data && data.message) || (res.status === 401 ? '登录已过期或未登录，请重新登录' : '导入失败（HTTP ' + res.status + '）'));
         importedCandidates = data.items || [];
-        var msg = '名单导入完成：新建 ' + (data.created || 0) + ' 人，更新 ' + (data.updated || 0) + ' 人';
+        var msg = '名单导入完成：新建 ' + (data.created || 0) + ' 人';
+        if (data.updated > 0) msg += '，更新（与系统已有账号重名、已更新资料并纳入本次考试）' + data.updated + ' 人';
         if (data.failed > 0) msg += '，失败 ' + data.failed + ' 人';
         toast(msg, data.failed > 0 ? 'warn' : 'success');
         if (data.errors && data.errors.length) {
@@ -616,12 +753,46 @@
       } catch(e) { toast(e.message, 'error'); }
     }
     async function deleteUser(id, username) {
-      if (!confirm('确定删除用户「' + username + '」？此操作不可撤销。')) return;
+      var preview;
       try {
-        await api('DELETE', '/users/' + id);
-        toast('已删除', 'success');
-        await refreshUserMgmt();
-      } catch(e) { toast(e.message, 'error'); }
+        preview = await api('GET', '/users/' + id + '/delete-preview');
+      } catch (e) { toast(e.message, 'error'); return; }
+
+      var body = '将删除用户「<strong>' + escHtml(preview.Username || username) + '</strong>」。';
+      if (preview.sessionCount > 0) {
+        body += '<br>该用户有 <b>' + preview.sessionCount + '</b> 份作答记录，分布：<ul style="margin:6px 0 0 18px;padding:0;">';
+        for (var i = 0; i < preview.byExam.length; i++) {
+          var b = preview.byExam[i];
+          body += '<li>' + escHtml(b.examTitle) + '：' + b.count + ' 份</li>';
+        }
+        body += '</ul>';
+      } else {
+        body += '<br>暂无作答记录。';
+      }
+      if (preview.referencedExamCount > 0) {
+        body += '<br>该用户被 <b>' + preview.referencedExamCount + '</b> 场考试（指定人员）引用，删除后会从对应名单中移除。';
+      }
+
+      var checks = '';
+      if (preview.sessionCount > 0) {
+        checks += '<label style="display:block;margin:6px 0;"><input type="checkbox" id="cdSessions"> 一并删除该用户的 ' + preview.sessionCount + ' 份作答记录（含成绩）</label>';
+      }
+      if (!checks) {
+        checks = '<p style="color:var(--text-secondary);font-size:13px;">该用户无作答记录，可直接删除。</p>';
+      }
+
+      openCascadeModal('删除用户', body, checks, async function () {
+        var cascadeSessions = document.getElementById('cdSessions') ? document.getElementById('cdSessions').checked : (preview.sessionCount === 0);
+        if (preview.sessionCount > 0 && !cascadeSessions) {
+          toast('请先勾选「一并删除作答记录」', 'warn'); return;
+        }
+        try {
+          await api('DELETE', '/users/' + id, { cascadeSessions: cascadeSessions });
+          toast('已删除', 'success');
+          closeCascadeModal();
+          await refreshUserMgmt();
+        } catch (e) { toast(e.message, 'error'); }
+      });
     }
     async function resetUserPwd(id, username) {
       var np = prompt('为用户「' + username + '」设置新密码：');
@@ -700,26 +871,10 @@
         btn.disabled = false;
         btn.textContent = '🚀 发布考试';
 
-        var msg = '✅ 「' + title + '」发布成功！\n\n';
-        msg += '总题数：' + result.totalQuestions + ' 道\n';
-        msg += '总分：' + result.totalScore + ' 分\n';
-        msg += '试卷类型：' + (result.paperMode === 'PerCandidate' ? '随机卷（按考生随机）' : '固定卷') + '\n';
-        msg += '有效期：' + start.toLocaleString() + ' ~ ' + end.toLocaleString() + '\n';
-        if (importedCandidates.length) {
-          msg += '考试对象：指定名单 ' + importedCandidates.length + ' 人\n';
-          if (result.candidatePassword) msg += '\n🔑 考生登录：\n用户名 = 工号\n密码 = ' + result.candidatePassword + '\n（所有人相同）';
-        } else {
-          msg += '考试对象：全员可考\n';
-        }
-        if (result.rules && result.rules.length) {
-          msg += '\n选题规则：\n';
-          for (var m = 0; m < result.rules.length; m++) {
-            var mi = result.rules[m];
-            var scopes = [mi.scope1, mi.scope2, mi.scope3].filter(Boolean).join('/');
-            msg += '  ' + scopes + ' / ' + (TYPE_LABELS[mi.type]||mi.type) + ' → ' + mi.count + '题 ×' + mi.scorePerQuestion + '分\n';
-          }
-        }
-        alert(msg);
+        var summary = '✅ 「' + title + '」发布成功！总题数 ' + result.totalQuestions + ' 道，总分 ' + result.totalScore + ' 分，' +
+          (result.paperMode === 'PerCandidate' ? '随机卷' : '固定卷');
+        if (importedCandidates.length) summary += '，指定 ' + importedCandidates.length + ' 人' + (result.candidatePassword ? '（统一密码 ' + result.candidatePassword + '）' : '');
+        toast(summary, 'success');
 
         // 重置表单
         document.getElementById('examTitle').value = '';
@@ -728,6 +883,9 @@
         initMatrix();
         clearCandidates();
         initExamTimes();
+
+        // 弹出考试入口（独立链接 + 二维码 + 考生密码/名单）
+        showExamEntrance(result.id);
       } catch(e) {
         toast(e.message, 'error');
         document.getElementById('btnPublish').disabled = false;
@@ -816,6 +974,35 @@
     }
 
     // --- 修改考试 ---
+    var eeUsersCache = null; // 编辑表单内考生列表的缓存（避免重复拉取）
+
+    async function renderEditTargetUsers() {
+      var box = document.getElementById('eeTargetUsers');
+      box.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;">加载中…</div>';
+      try {
+        if (!eeUsersCache) eeUsersCache = await api('GET', '/users');
+        // 当前已选中的考生（可能是空，也可能是从 All → Specified 切换前从未填过）
+        var checked = document.querySelectorAll('.ee-target:checked');
+        var ids = {};
+        for (var i = 0; i < checked.length; i++) ids[parseInt(checked[i].value)] = 1;
+        var html = '';
+        var visible = 0;
+        for (var j = 0; j < eeUsersCache.length; j++) {
+          var u = eeUsersCache[j];
+          // 只列出候选人：排除管理员（admin 除外，按角色过滤）
+          if (u.role !== 'Candidate') continue;
+          visible++;
+          html += '<label style="display:inline-flex;align-items:center;margin-right:14px;margin-bottom:6px;font-size:13px;cursor:pointer;">' +
+                  '<input type="checkbox" class="ee-target" value="' + u.id + '"' + (ids[u.id] ? ' checked' : '') + ' style="margin-right:4px;"> ' +
+                  escHtml(u.username) + ' (' + escHtml(u.displayName || '') + ')' +
+                  '</label>';
+        }
+        box.innerHTML = html || '<div style="color:var(--text-secondary);font-size:13px;">⚠ 系统中暂无考生账号，请先到「用户管理」新增</div>';
+      } catch(e) {
+        box.innerHTML = '<div style="color:var(--danger);font-size:13px;">加载考生失败：' + escHtml(e.message || '') + '</div>';
+      }
+    }
+
     async function editExamMgmt(id) {
       try {
         var d = await api('GET', '/exams/' + id);
@@ -825,28 +1012,35 @@
         document.getElementById('eeEndTime').value = d.endTime ? toLocalInput(new Date(d.endTime)) : '';
         document.getElementById('eeTargetMode').value = d.targetMode || 'All';
         toggleEditTargetUsers(d.targetMode);
+        // 清空勾选与缓存：每次打开编辑表单都重新加载候选名单，保证新创建的考生能立刻看到
+        document.getElementById('eeTargetUsers').innerHTML = '';
+        var checkedOld = document.querySelectorAll('.ee-target:checked');
+        for (var k = 0; k < checkedOld.length; k++) checkedOld[k].checked = false;
+        eeUsersCache = null;
 
         if (d.targetMode === 'Specified') {
-          var users = await api('GET', '/users');
+          await renderEditTargetUsers();
+          // 预勾选该考试原有的指定考生
           var ids = {};
           for (var i = 0; i < (d.targetUserIds || []).length; i++) ids[d.targetUserIds[i]] = 1;
-          var html = '';
-          for (var j = 0; j < users.length; j++) {
-            var u = users[j];
-            if (u.role !== 'Candidate') continue;
-            html += '<label style="display:inline-flex;align-items:center;margin-right:14px;margin-bottom:6px;font-size:13px;cursor:pointer;">' +
-                    '<input type="checkbox" class="ee-target" value="' + u.id + '"' + (ids[u.id] ? ' checked' : '') + ' style="margin-right:4px;"> ' +
-                    escHtml(u.username) + ' (' + escHtml(u.displayName || '') + ')' +
-                    '</label>';
+          var preselected = document.querySelectorAll('.ee-target');
+          for (var n = 0; n < preselected.length; n++) {
+            if (ids[parseInt(preselected[n].value)]) preselected[n].checked = true;
           }
-          document.getElementById('eeTargetUsers').innerHTML = html || '<div style="color:var(--text-secondary);font-size:13px;">⚠ 暂无考生账号，请先到「用户管理」新增</div>';
         }
         document.getElementById('examEditModal').classList.add('active');
       } catch(e) { toast(e.message, 'error'); }
     }
 
-    function toggleEditTargetUsers(mode) {
+    async function toggleEditTargetUsers(mode) {
       document.getElementById('eeTargetUsersPanel').style.display = mode === 'Specified' ? '' : 'none';
+      // 切换到「指定人员」时，若尚未加载考生列表则懒加载（覆盖从 All 切到 Specified 的场景）
+      if (mode === 'Specified') {
+        var box = document.getElementById('eeTargetUsers');
+        if (!box.innerHTML || box.innerHTML.indexOf('加载中') !== -1 || box.innerHTML.indexOf('暂无考生') !== -1) {
+          await renderEditTargetUsers();
+        }
+      }
     }
 
     function closeExamEdit() { document.getElementById('examEditModal').classList.remove('active'); }
@@ -880,18 +1074,89 @@
       } catch(e) { toast(e.message, 'error'); }
     }
 
-    // --- 删除考试 ---
+    // ===== 删除确认弹窗（级联清除，需求1）=====
+    function ensureCascadeModal() {
+      if (document.getElementById('cascadeDeleteModal')) return;
+      var d = document.createElement('div');
+      d.className = 'modal-overlay';
+      d.id = 'cascadeDeleteModal';
+      d.innerHTML =
+        '<div class="modal" style="max-width:560px;">' +
+          '<h3 id="cdTitle"></h3>' +
+          '<div id="cdBody" style="font-size:14px;line-height:1.7;"></div>' +
+          '<div id="cdChecks" style="margin:14px 0;"></div>' +
+          '<div class="modal-footer">' +
+            '<button class="btn btn-outline" onclick="closeCascadeModal()">取消</button>' +
+            '<button class="btn btn-danger" id="cdConfirm">确认删除</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(d);
+    }
+    function openCascadeModal(title, bodyHtml, checksHtml, onConfirm) {
+      ensureCascadeModal();
+      document.getElementById('cdTitle').textContent = title;
+      document.getElementById('cdBody').innerHTML = bodyHtml;
+      document.getElementById('cdChecks').innerHTML = checksHtml;
+      var btn = document.getElementById('cdConfirm');
+      btn.onclick = onConfirm;
+      document.getElementById('cascadeDeleteModal').classList.add('active');
+    }
+    function closeCascadeModal() {
+      var m = document.getElementById('cascadeDeleteModal');
+      if (m) m.classList.remove('active');
+    }
+
+    // --- 删除考试（先预览关联数据，再由管理员勾选是否级联清除）---
     async function confirmDeleteExam(id, title, pcount) {
-      if (pcount > 0) {
-        alert('「' + title + '」已有 ' + pcount + ' 人作答，不能删除！\n\n如需让考生不可见，可使用「关闭」操作。');
-        return;
-      }
-      if (!confirm('确定要删除考试「' + title + '」吗？\n该操作不可撤销！')) return;
+      var preview;
       try {
-        await api('DELETE', '/exams/' + id);
-        toast('已删除', 'success');
-        loadExams();
-      } catch(e) { toast(e.message, 'error'); }
+        preview = await api('GET', '/exams/' + id + '/delete-preview');
+      } catch (e) { toast(e.message, 'error'); return; }
+
+      var body = '将删除考试「<strong>' + escHtml(preview.Title || title) + '</strong>」。';
+      if (preview.sessionCount > 0) {
+        body += '<br>关联 <b>' + preview.sessionCount + '</b> 份作答记录（已交卷 ' + preview.submittedCount + '、进行中 ' + preview.inProgressCount + '）。';
+      } else {
+        body += '<br>暂无作答记录。';
+      }
+      if (preview.candidateCount > 0) {
+        body += '<br>关联考生 <b>' + preview.candidateCount + '</b> 名（其中仅被本场引用、可安全删除的 ' + preview.exclusiveCandidateCount + ' 名）。';
+      }
+
+      var checks = '';
+      if (preview.sessionCount > 0) {
+        checks += '<label style="display:block;margin:6px 0;"><input type="checkbox" id="cdSessions"> 一并删除本考试的 ' + preview.sessionCount + ' 份作答记录（含成绩）</label>';
+      }
+      if (preview.exclusiveCandidateCount > 0) {
+        // 有作答记录时，级联删考生需先勾选"删除作答记录"（避免悬空会话）；无作答记录时直接可勾选。
+        var usersDisabled = preview.sessionCount > 0 ? ' disabled' : '';
+        var usersHint = preview.sessionCount > 0 ? '（需先勾选上方"删除作答记录"）' : '';
+        checks += '<label style="display:block;margin:6px 0;"><input type="checkbox" id="cdUsers"' + usersDisabled + '> 一并删除仅被本场引用的 ' + preview.exclusiveCandidateCount + ' 名考生账号' + usersHint + '</label>';
+      }
+      if (!checks) {
+        checks = '<p style="color:var(--text-secondary);font-size:13px;">该考试无作答记录，可直接删除。</p>';
+      }
+
+      openCascadeModal('删除考试', body, checks, async function () {
+        var cascadeSessions = document.getElementById('cdSessions') ? document.getElementById('cdSessions').checked : (preview.sessionCount === 0);
+        var cascadeUsers = document.getElementById('cdUsers') ? document.getElementById('cdUsers').checked : false;
+        if (preview.sessionCount > 0 && !cascadeSessions) {
+          toast('请先勾选「一并删除作答记录」', 'warn'); return;
+        }
+        try {
+          await api('DELETE', '/exams/' + id, { cascadeSessions: cascadeSessions, cascadeUsers: cascadeUsers });
+          toast('已删除', 'success');
+          closeCascadeModal();
+          loadExams();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+
+      // 有作答记录时：勾选"删除作答记录"后才放行"级联删考生"；无作答记录时 cdUsers 本就可用
+      var sEl = document.getElementById('cdSessions');
+      var uEl = document.getElementById('cdUsers');
+      if (sEl && uEl) {
+        sEl.addEventListener('change', function () { uEl.disabled = !sEl.checked; });
+      }
     }
 
     // --- 重新发布 ---
@@ -915,7 +1180,8 @@
         var d = await api('GET', '/exams/' + id + '/entrance');
         var statusText = d.status === 'Published' ? '进行中' : d.status === 'Closed' ? '已关闭' : d.status;
         var statusColor = d.status === 'Published' ? 'background:#e6f7ff;color:#1890ff;' : 'background:#f0f0f0;color:#666;';
-        var fullUrl = window.location.origin + d.frontendUrl;
+        var entryUrl = d.entryUrl || d.frontendUrl || '/exam.html';
+        var fullUrl = window.location.origin + entryUrl;
         var pwdEsc = (d.candidatePassword || '').replace(/'/g, "\\'");
         var urlEsc = fullUrl.replace(/'/g, "\\'");
 
@@ -924,11 +1190,17 @@
           '<div style="font-size:16px;font-weight:600;">' + escHtml(d.title) +
             ' <span class="tag" style="margin-left:6px;' + statusColor + '">' + statusText + '</span></div>' +
         '</div>' +
-        '<div style="margin-bottom:14px;">' +
-          '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">考生入口（登录后自动看到此考试）</div>' +
-          '<div style="display:flex;gap:8px;align-items:center;">' +
-            '<input type="text" readonly value="' + escHtml(fullUrl) + '" style="flex:1;font-family:monospace;">' +
-            '<button class="btn btn-primary btn-sm" onclick="copyToClipboard(\'' + urlEsc + '\', this)">📋 复制</button>' +
+        '<div style="display:flex;gap:18px;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;">' +
+          '<div style="text-align:center;">' +
+            '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">扫码进入（考生手机扫此码）</div>' +
+            '<div id="qrBox" style="width:180px;height:180px;padding:8px;background:#fff;border:1px solid #eee;border-radius:8px;"></div>' +
+          '</div>' +
+          '<div style="flex:1;min-width:240px;">' +
+            '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">考生入口链接（每场独立，可分享）</div>' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+              '<input type="text" readonly value="' + escHtml(fullUrl) + '" style="flex:1;font-family:monospace;">' +
+              '<button class="btn btn-primary btn-sm" onclick="copyToClipboard(\'' + urlEsc + '\', this)">📋 复制</button>' +
+            '</div>' +
           '</div>' +
         '</div>';
 
@@ -950,10 +1222,24 @@
           }
           html += '</tbody></table></div></div>';
         } else {
-          html += '<div style="padding:10px 14px;background:var(--bg);border-radius:6px;color:var(--text-secondary);font-size:13px;">📌 此考试为「全员可考」模式，所有考生登录后即可在「考试列表」中看到。</div>';
+          html += '<div style="padding:10px 14px;background:var(--bg);border-radius:6px;color:var(--text-secondary);font-size:13px;">📌 此考试为「全员可考」模式，所有考生登录后即可在「考试列表」中看到。如需独立入口，可改用「指定人员」模式发布。</div>';
         }
         document.getElementById('entranceBody').innerHTML = html;
         document.getElementById('examEntranceModal').classList.add('active');
+
+        // 生成二维码（vendored qrcode.min.js）
+        try {
+          var qrBox = document.getElementById('qrBox');
+          if (qrBox && typeof QRCode !== 'undefined') {
+            qrBox.innerHTML = '';
+            new QRCode(qrBox, {
+              text: fullUrl,
+              width: 164, height: 164,
+              colorDark: '#000000', colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.M
+            });
+          }
+        } catch (e) { console.error('QR gen error:', e); }
       } catch(e) { toast(e.message, 'error'); }
     }
 
